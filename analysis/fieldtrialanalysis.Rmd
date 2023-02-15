@@ -1,0 +1,145 @@
+---
+title: "fieldtrialanalysis"
+author: "Opamelas83"
+date: "2023-02-09"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## 1. Download phenotypic traits from Cassavabase following these steps
+  a. I downloaded all traits with the words "branch"/"flower"/"stem/"/"fork"/"node"/"canopy"/"leaf area/"plant height" to make a list of my plant architecture trait called "Architect_trait. .  
+  b. Select the following `Trial Types` according to Luciano:
+      - *Clonal Evaluation*;
+      - *Preliminary Yield Trial*;
+      - *Advanced Yield Trial*;
+      - *Uniform Yield Trial*;
+      - *Regional Trials*;
+      - *phenotyping_trial*.
+   c. Select `Years` from 2010 to 2022.
+   d. Select all the `trials` available at cassavabase after the filter, download the phenotypic data as "Architect_trait.csv"
+   
+## 2. Phenotypic data Information: The objective is Find a way to choose the traits we will consider for genomic selection. Chek the list of the traits,the number of trials in which the traits were measured. It can be evaluated by programm 
+### Table 1: List of traits and their number of trials par Program and Year
+```{r}
+library(tidyverse); library(data.table); library(reshape2);  library(reactable); library(here)
+ArchiData_pheno <- read.csv(file = here::here("data", "Architect_trait.csv"), header = T, na.strings = "", skip = 2)
+ArchiData_meta <- read.csv(file = here::here("data", "Archimetadata.csv"), header = T, na.strings = "", skip = 2)
+ArchiData_meta <- ArchiData_meta %>% select(studyName, studyDescription,
+studyYear, studyDesign, locationDbId, locationName, trialType,
+plantingDate, harvestDate, plotWidth, plotLength, fieldSize,
+fieldTrialIsPlannedToBeGenotyped, fieldTrialIsPlannedToCross)
+ArchiData  <- left_join(ArchiData_pheno,ArchiData_meta )
+
+AchiData1 <- ArchiData %>% reshape2::melt(data = .,
+                                id.vars = c("studyYear", "programDbId", "programName", "programDescription",
+                                                            "studyDbId", "studyName", "trialType", "studyDesign", "plotWidth",
+                                                            "plotLength", "fieldSize", "fieldTrialIsPlannedToBeGenotyped",
+                                                            "fieldTrialIsPlannedToCross", "plantingDate", "harvestDate",
+                                                            "locationDbId", "locationName", "germplasmDbId", "germplasmName",
+                                                            "germplasmSynonyms", "observationLevel", "observationUnitDbId",
+                                                            "observationUnitName", "replicate", "blockNumber", "plotNumber",
+                                                            "rowNumber", "colNumber", "entryType", "plantNumber"),
+                                                variable.name = "Trait",
+                                                value.name = "Value") 
+AchiData2 <- AchiData1[!is.na(AchiData1$Value),]
+saveRDS(object = AchiData2, file = here::here("data", "ArchiPAGP.RDS"))## Why to save like that? Why not csv? let's continue to see. 
+ArchiDatap <- readRDS(here("data","ArchiPAGP.RDS"))
+ArchiData3 <- ArchiDatap %>% select(programName, studyYear, Trait, studyName) %>% unique()
+
+Table1 <- table(ArchiData3$programName, ArchiData3$studyYear, ArchiData3$Trait) %>% as.data.frame()
+colnames(Table1) <- c("programName", "Year", "Trait", "nb_Trials")
+Table1 <- Table1[Table1$`nb_Trials`!=0,] %>% 
+  filter(Trait %in% str_subset(Trait, "CO"))
+Table1 %>% reactable(groupBy = c("Trait", "programName"), columns = list(
+  "nb_Trials" = colDef(aggregate = "sum")), defaultPageSize = 15)
+write_csv(Table1, "output/Trait_Table1.csv")
+```
+## 3. This step is to filter the trait and keep those measured in more than 50 trials. I would filter up to 100 but some important traits related to flowering and stem have trials number under 100.
+### Table2: Table of trait with 50 trials or more 
+```{r}
+Table22 <- ArchiData3 %>% 
+  select(Trait, studyName) %>%
+  filter(Trait %in% str_subset(Trait, "CO")) %>%
+  group_by(Trait) %>% 
+  summarise(nb_Trials=n())
+Table2 <- Table22 %>% filter(nb_Trials >= 50)
+```
+
+## 4. Making my data set with with the selected trait
+
+```{r}
+Mytraits <- Table2 %>% select(Trait) %>% as.data.frame() 
+Mytraits <- transpose(Mytraits)
+names(Mytraits) <- as.character(unlist(Mytraits[1,]))
+MyArchidata <- ArchiData %>% select(all_of(colnames(Mytraits)), studyYear, programName, studyName, trialType, studyDesign, plotWidth, plotLength, locationName, germplasmName,replicate, blockNumber, plotNumber, plantNumber) %>% mutate(BranchlevelNum = branching.level.counting.CO_334.0000079,                    
+FirstBranchHeight = first.apical.branch.height.measurement.in.cm.CO_334.0000106,
+FlowerVisRate = flowering.ability.visual.assessment.0.3.CO_334.0000233,     
+PlantArchitecture = plant.architecture.visual.rating.1.5.CO_334.0000099,        
+PlantHeight = plant.height.measurement.in.cm.CO_334.0000018,              
+PlantHeightLeaf = plant.height.with.leaf.in.cm.CO_334.0000123,                
+StemNum = stem.number.counting.CO_334.0000129,
+Location = locationName,
+Year = studyYear,
+trialType = case_when(trialType == "Uniform Yield Trial" ~ "UYT",
+                      trialType == "Clonal Evaluation" ~ "CET",
+                      trialType == "Advanced Yield Trial" ~ "AYT",
+                      trialType == "Preliminary Yield Trial" ~ "PYT",
+                      trialType == "Regional Trials" ~ "RT",
+                      trialType == "phenotyping_trial" ~ "PeT"),
+Periode = ifelse(Year <= 2015,
+                                  yes = "Before_2015",
+                                  no = "After_2015"),
+
+                     .keep = "unused") %>% 
+  filter(!(is.na(trialType))) %>% 
+  mutate(BranchlevelNum = as.numeric(BranchlevelNum),
+         FlowerVisRate = as.numeric(FlowerVisRate),
+         PlantArchitecture = as.numeric(PlantArchitecture),
+         PlantHeightLeaf = round(as.numeric(PlantHeightLeaf), digits = 1),
+         PlantHeight = round(as.numeric(PlantHeight), digits = 1),
+         FirstBranchHeight = round(as.numeric(FirstBranchHeight), digits = 1),
+         StemNum = as.numeric(StemNum)) %>%
+  filter(PlantHeight < 1000 | is.na(PlantHeight)) %>%
+  filter(BranchlevelNum < 10 | is.na(BranchlevelNum)) %>%
+  filter(FirstBranchHeight < 600 | is.na(FirstBranchHeight)) %>%
+  filter(StemNum < 10 | is.na(StemNum)) 
+```
+
+Data distribution visualization
+```{r}
+ ArchiQuanttraits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantHeightLeaf", "StemNum")
+
+ArchiQuantdistri <- MyArchidata %>%
+     # Convert the data to "long format" 
+     pivot_longer(cols = all_of(ArchiQuanttraits), 
+                  names_to = "Trait", values_to = "ArchiQuantValue") %>%
+     filter(!is.na(ArchiQuantValue))
+
+ArchiQuantdistri$trialType <- factor(ArchiQuantdistri$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT", "PeT", "RT")) # Reordering group factor levels
+ArchiQuantdistri$Trait <- factor(ArchiQuantdistri$Trait,      
+                        levels = c("PlantHeight", "PlantHeightLeaf", "FirstBranchHeight", "BranchlevelNum", "StemNum"))
+
+ggplot(data = ArchiQuantdistri,
+                             aes(x=trialType,y=ArchiQuantValue, fill = Trait)) +
+  geom_boxplot(stat = "boxplot") +
+  stat_summary(fun=mean, na.rm = TRUE) +
+  labs(x= "Tria type", y= "Values") + theme_bw() +
+    facet_grid(Trait~trialType, scales = "free")
+
+#For qualitative trait
+MyArchidata$trialType <- factor(MyArchidata$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT", "PeT", "RT"))
+
+ggplot(MyArchidata, aes(x = FlowerVisRate, fill = trialType)) +
+   geom_bar(position = "dodge") +
+   xlim(0,6) +
+   labs(x= "FlowerVisRate", y= "Value") + theme_bw()
+
+ggplot(MyArchidata, aes(x = PlantArchitecture, fill = trialType)) +
+   geom_bar(position = "dodge") +
+   xlim(0,6) +
+   labs(x= "PlantArchitecture", y= "Value") + theme_bw()
+```
+
