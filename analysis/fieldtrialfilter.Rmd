@@ -1,0 +1,350 @@
+---
+title: "fieldtrialfilter"
+author: "Opamelas83"
+date: "2023-02-15"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## check the number of each trait observations by trial. because most of the trials have less than the 3 traits observed. 
+```{r}
+library(tidyverse); library(data.table); library(lme4); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm)
+MyArchiphenos <- read.csv("data/MyArchiphenotypes.csv")
+#The pipeline version of this analysis will use the TRUE/FALSE values of CompleteBlocks and IncompleteBlocks (Preliminary analysis of trial data ).
+MyArchiphenos  %>% 
+     count(CompleteBlocks,IncompleteBlocks,UniqueRepBloc,Location) %>% 
+     spread(Location,n)
+```
+
+#Convert the data to “long format” . Remove missing values. “Nest” the data by Trait.
+```{r}
+ArchiTRaits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture")
+MyArchiphenos <- MyArchiphenos %>% 
+     # Convert the data to "long format" 
+     pivot_longer(cols = all_of(ArchiTRaits), 
+                  names_to = "ArchiTrait", values_to = "ArchiValue") %>% 
+     # Remove missing values 
+     filter(!is.na(ArchiValue)) %>% 
+     filter(!is.na(germplasmName)) %>%
+     # Nest the MultiEnvironmentTrial data by trait
+     nest(METdata=c(-ArchiTrait))
+
+
+ MyArchidata_check <- MyArchidata %>% 
+   dplyr::select(studyName, PlantHeight, FirstBranchHeight, BranchlevelNum, PlantArchitecture) %>% 
+   group_by(studyName) %>%
+    summarize(nPlantHeight = length(na.omit(PlantHeight)),
+                 nFirstBranchHeight = length(na.omit(FirstBranchHeight)),
+                 nBranchlevelNum = length(na.omit(BranchlevelNum)),
+                 nPlantArchitecture = length(na.omit(PlantArchitecture)))
+ #Create unique ID for year and location
+ MyArchidata <- MyArchidata %>% 
+  filter(!is.na(germplasmName)) %>% 
+   mutate(yearInLoc=paste0(programName,"_",Location,"_",Year),
+          trialInLocYr=paste0(yearInLoc,"_",studyName),
+          repInTrial=paste0(trialInLocYr,"_",replicate))
+```
+
+I should run lme model by trait because in some trials only 1 trait is observed.
+```{r}
+### We are working with a total of 391 trials and 64 of them have not been replicated (nmax(replicate = 1). Should I remove all the trials with one replicate? Let's try it. The unreplicated trials are 77 unique.
+#non_replicated_trials <- MyArchidata %>% dplyr::filter(studyName %in% List_non_replicated_trials)
+#some trials have only 1 genotype, should I remove them? Also some genotypes have only one observation by trial??
+
+#replicated checks, errors variance on the checks
+non_replicated_trials <- MyArchidata %>% 
+  filter(!is.na(replicate)) %>%
+  group_by(studyName) %>% 
+  summarise(n=length(studyName), n1 = max(replicate)) %>% 
+  filter(n1==1) %>% 
+  dplyr::select(studyName)
+
+List_non_replicated_trials <- non_replicated_trials$studyName 
+replicated_trials_data <- MyArchidata %>% 
+   dplyr::filter(!studyName %in% List_non_replicated_trials)
+non_replicated_trials_data <- MyArchidata %>% 
+   dplyr::filter(studyName %in% List_non_replicated_trials)
+#So I will run the model without replicate/location/year effect 
+
+ArchiTRaits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture")
+
+Archiphenos <- MyArchidata %>% filter(!is.na(germplasmName)) %>%
+     pivot_longer(cols = all_of(ArchiTRaits), 
+                  names_to = "Trait", values_to = "ArchiValue") %>%
+     filter(!is.na(ArchiValue)) 
+
+ArchiTRials <- Archiphenos$studyName %>% table %>% .[order(.)] %>% names
+#i <- ArchiTRaits[1]
+j <- ArchiTRials[1]
+results <- tibble()
+#for(i in ArchiTRaits){
+ for(j in ArchiTRials){
+     Data <- Archiphenos %>% 
+       filter(studyName == j)#Trait == i,
+     if(nrow(Data) > 1){
+     try(MixedModels <- lmer(ArchiValue ~ 1 + (1|germplasmName), data = Data))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(#Traits = i,
+                      Trials = j,
+                          VarG = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[2,2],
+                      #VarRes = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[3,2],
+                      Mean = as.data.frame(fixef(MixedModels))[1,],
+                      H2 = VarG/(VarG + VarE/meanNreps),
+                      CV = sigma(MixedModels)/Mean, 
+                      PEV = mean((se.ranef(MixedModels)$germplasmName[,1])^2), 
+                      Ac = (1-PEV/VarG)^(1/2)
+                      #Real = suppressWarnings(MuMIn::r.squaredGLMM(MixedModel_PlantHeight)[2]),Thus, Ac = accuracy of the individual prediction = Reliability^(1/2) of each BLUP value. 
+ ))
+     try(results <- bind_rows(results, result))
+     #rm(MixedModels); rm(result); rm(MixedModelsrd)
+     }
+ }
+ #}
+
+results 
+write.table(results, file = "Result/MixedModelResults.csv", quote = F, sep =",",
+            row.names = F)
+
+results %>% group_by(Trial) %>%
+  summarise(Ntraits = n(),
+            VarGmean = mean(VarG, na.rm = F),
+            VarEmean = mean(VarE, na.rm = F),
+            H2mean = mean(H2, na.rm = F),
+            Real = mean(Real, na.rm = F),
+            DvPrb = mean(DvPrb, na.rm = F)) -> results2
+      
+
+write.table(results2, file = "Result/MeansVarCompMixedModels.csv", quote = F,
+            sep = ",", row.names = F)
+## 2 trials have observation level = "plant" and 389 trials have observation level= "plot", both have high /low row observation number.
+## some trials have a genotypes repeated only one genotype
+```
+
+
+#BranchlevelNum"
+```{r}
+ArchiTRials <- MyArchidata %>% filter(!is.na(BranchlevelNum)) %>% dplyr::select(studyName) %>% table %>% .[order(.)] %>% names
+
+j <- ArchiTRials[1]
+results <- tibble()
+for(j in ArchiTRials){
+     Data <- MyArchidata  %>% 
+       filter(!is.na(BranchlevelNum), BranchlevelNum !=0) %>%
+       filter(studyName == j)
+     if(nrow(Data) != 0){
+     try(MixedModels_BranchlevelNum <- lmer(BranchlevelNum ~ 1 + (1|germplasmName), data = Data))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(#Traits = i,
+                      Trials = j,
+                          VarG = as.data.frame(VarCorr(MixedModels_BranchlevelNum))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels_BranchlevelNum))[,c("grp","vcov")] %>% .[2,2],
+                      Mean = as.data.frame(fixef(MixedModels_BranchlevelNum))[1,],
+                      H2 = VarG/(VarG + VarE/meanNreps),
+                      CV = sigma(MixedModels_BranchlevelNum)/Mean, 
+                      PEV = mean((se.ranef(MixedModels_BranchlevelNum)$germplasmName[,1])^2), 
+                      Ac = (1-PEV/VarG)^(1/2)
+ 
+))
+     try(results_BranchlevelNum <- bind_rows(results, result))
+     #rm(MixedModels_BranchlevelNum); rm(result)
+     }
+ }
+
+
+results_BranchlevelNum
+
+#write.table(results, file = "Result/MixedModelResults.csv", quote = F, sep =",", row.names = F)
+
+#results %>% group_by(Trials) %>%
+  #summarise(Ntraits = n(),
+   #         VarGmean = mean(VarG, na.rm = F),
+     #       VarEmean = mean(VarE, na.rm = F),
+      #      H2mean = mean(H2, na.rm = F),
+      #      Real = mean(Real, na.rm = F),
+        #    DvPrb = mean(DvPrb, na.rm = F)) -> results2
+      
+
+#write.table(results2, file = "Result/MeansVarCompMixedModels.csv", quote = F,
+       #     sep = ",", row.names = F)
+```
+
+#PlantArchitecture"
+```{r}
+ArchiTRials <- MyArchidata$studyName %>% table %>% .[order(.)] %>% names
+j <- ArchiTRials[1]
+results <- tibble()
+for(j in ArchiTRials){
+     Data <- MyArchidata  %>% 
+       filter(!is.na(PlantArchitecture)) %>%
+       filter(studyName == "20.CMSSurveyVarieties.AYT.33.IB")
+     if(nrow(Data) != 0){
+     try(MixedModels_PlantArchitecture <- lmer(PlantArchitecture ~ 1 + (1|germplasmName), data = Data))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(Trials = j,
+                          VarG = as.data.frame(VarCorr(MixedModels_PlantArchitecture))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels_PlantArchitecture))[,c("grp","vcov")] %>% .[2,2],
+                      #VarRes = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[3,2],
+                      Mean = as.data.frame(fixef(MixedModels_PlantArchitecture))[1,],
+                      H2 = VarG/(VarG + VarE/meanNreps),
+                      CV = sigma(MixedModels_PlantArchitecture)/Mean, 
+                      PEV = mean((se.ranef(MixedModels_PlantArchitecture)$germplasmName[,1])^2), 
+                      Ac = (1-PEV/VarG)^(1/2)
+ ))
+     try(results_PlantArchitecture <- bind_rows(results, result))
+     rm(MixedModels_PlantArchitecture); rm(result)
+     }
+ }
+
+
+results_PlantArchitecture
+
+#write.table(results, file = "Result/MixedModelResults.csv", quote = F, sep =",",
+        #    row.names = F)
+
+#results %>% group_by(Trial) %>%
+#  summarise(Ntraits = n(),
+ #           VarGmean = mean(VarG, na.rm = F),
+  #          VarEmean = mean(VarE, na.rm = F),
+   #         H2mean = mean(H2, na.rm = F),
+    #        Real = mean(Real, na.rm = F),
+     #       DvPrb = mean(DvPrb, na.rm = F)) -> results2
+      
+
+#write.table(results2, file = "Result/MeansVarCompMixedModels.csv", quote = F,
+ #           sep = ",", row.names = F)
+```
+
+#FirstBranchHeight
+```{r}
+ArchiTRials <- MyArchidata$studyName %>% table %>% .[order(.)] %>% names
+j <- ArchiTRials[1]
+results <- tibble()
+for(j in ArchiTRials){
+     Data <- MyArchidata  %>% 
+       filter(!is.na(FirstBranchHeight)) %>%
+       filter(studyName == "20.CMSSurveyVarieties.AYT.33.IB")
+     if(nrow(Data) != 0){
+     try(MixedModels_FirstBranchHeight <- lmer(FirstBranchHeight ~ 1 + (1|germplasmName), data = Data))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(Trials = j,
+                          VarG = as.data.frame(VarCorr(MixedModels_FirstBranchHeight))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels_FirstBranchHeight))[,c("grp","vcov")] %>% .[2,2],
+                      #VarRes = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[3,2],
+                      Mean = as.data.frame(fixef(MixedModels_FirstBranchHeight))[1,],
+                      H2 = VarG/(VarG + VarE/meanNreps),
+                      CV = sigma(MixedModels_FirstBranchHeight)/Mean, 
+                      PEV = mean((se.ranef(MixedModels_FirstBranchHeight)$germplasmName[,1])^2), 
+                      Ac = (1-PEV/VarG)^(1/2)
+ ))
+     try(results_FirstBranchHeight <- bind_rows(results, result))
+     rm(MixedModels_FirstBranchHeight); rm(result)
+     }
+ }
+
+
+results_FirstBranchHeight
+
+#write.table(results, file = "Result/MixedModelResults.csv", quote = F, sep =",",
+        #    row.names = F)
+
+#results %>% group_by(Trial) %>%
+#  summarise(Ntraits = n(),
+ #           VarGmean = mean(VarG, na.rm = F),
+  #          VarEmean = mean(VarE, na.rm = F),
+   #         H2mean = mean(H2, na.rm = F),
+    #        Real = mean(Real, na.rm = F),
+     #       DvPrb = mean(DvPrb, na.rm = F)) -> results2
+      
+
+#write.table(results2, file = "Result/MeansVarCompMixedModels.csv", quote = F,
+ #           sep = ",", row.names = F)
+```
+#PlantHeight"
+```{r}
+ArchiTRials <- MyArchidata$studyName %>% table %>% .[order(.)] %>% names
+j <- ArchiTRials[1]
+results <- tibble()
+for(j in ArchiTRials){
+     Data <- MyArchidata  %>% 
+       filter(!is.na(PlantHeight)) %>%
+       filter(studyName == "20.CMSSurveyVarieties.AYT.33.IB")
+     if(nrow(Data) != 0){
+     try(MixedModels_PlantHeight <- lmer(PlantHeight ~ 1 + (1|germplasmName), data = Data))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(Trials = j,
+                          VarG = as.data.frame(VarCorr(MixedModels_PlantHeight))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels_PlantHeight))[,c("grp","vcov")] %>% .[2,2],
+                      #VarRes = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[3,2],
+                      Mean = as.data.frame(fixef(MixedModels_PlantHeight))[1,],
+                      H2 = VarG/(VarG + VarE/meanNreps),
+                      CV = sigma(MixedModels_PlantHeight)/Mean, 
+                      PEV = mean((se.ranef(MixedModels_PlantHeight)$germplasmName[,1])^2), 
+                      Ac = (1-PEV/VarG)^(1/2)
+ ))
+     try(results_PlantHeight <- bind_rows(results, result))
+     rm(MixedModels_PlantHeight); rm(result)
+     }
+ }
+
+
+results_PlantHeight
+
+#write.table(results, file = "Result/MixedModelResults.csv", quote = F, sep =",",
+        #    row.names = F)
+
+#results %>% group_by(Trial) %>%
+#  summarise(Ntraits = n(),
+ #           VarGmean = mean(VarG, na.rm = F),
+  #          VarEmean = mean(VarE, na.rm = F),
+   #         H2mean = mean(H2, na.rm = F),
+    #        Real = mean(Real, na.rm = F),
+     #       DvPrb = mean(DvPrb, na.rm = F)) -> results2
+      
+
+#write.table(results2, file = "Result/MeansVarCompMixedModels.csv", quote = F,
+ #           sep = ",", row.names = F)
+```
+
+```{r}
+
+Archiphenos <- MyArchidata %>% filter(!is.na(germplasmName)) %>%
+     pivot_longer(cols = all_of(ArchiTRaits), 
+                  names_to = "Trait", values_to = "ArchiValue") %>%
+     filter(!is.na(ArchiValue)) 
+
+ArchiTRials <- MyArchidata %>% filter(!is.na(PlantHeight)) %>% dplyr::select(studyName) %>% table %>% .[order(.)] %>% names
+
+j <- ArchiTRials[1]
+results <- tibble()
+ for(j in ArchiTRials){
+     Data <- MyArchidata %>% 
+       filter(studyName == j)
+     if(nrow(Data) > 1){
+     try(MixedModels_BranchlevelNum <- lmer(PlantHeight ~ 1 + (1|germplasmName), data = Data))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(Trials = j,
+                          VarG = as.data.frame(VarCorr(MixedModels_BranchlevelNum))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels_BranchlevelNum))[,c("grp","vcov")] %>% .[2,2],
+                      #VarRes = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[3,2],
+                      Mean = as.data.frame(fixef(MixedModels_BranchlevelNum))[1,],
+                      H2 = VarG/(VarG + VarE/meanNreps),
+                      CV = sigma(MixedModels_BranchlevelNum)/Mean, 
+                      PEV = mean((se.ranef(MixedModels_BranchlevelNum)$germplasmName[,1])^2), 
+                      Ac = (1-PEV/VarG)^(1/2)
+ ))
+     try(results_BranchlevelNum <- bind_rows(results, result))
+     #rm(MixedModels_BranchlevelNum); rm(result)
+     }
+ }
+ 
+```
+```
+

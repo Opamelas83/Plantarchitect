@@ -1,0 +1,109 @@
+---
+title: "data_curation"
+author: "Opamelas83"
+date: "2023-02-23"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+### Check experimental designs: the database has several designing trials, I will separate data by designs before check it. 
+```{r}
+library(tidyverse); library(data.table); library(lme4); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm); library(gt)library(reshape2);  library(reactable)
+MyArchidata <- read.csv("data/MyArchidata.csv")
+MyArchidata %>% group_by(studyDesign) %>% 
+     summarize(N_trials=length(unique(studyName)))
+#"BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture"      
+# unique(MyArchidata$studyDesign)
+#Alpha(85), Augmented(48), CRD(35), Lattice(1), RCBD(273), splitplot(2)
+MyArchidata %>% 
+  count(studyName, trialType, Location, observationLevel, replicate, blockNumber, entryType) %>%
+  spread(entryType,n) %>%
+  gt()
+#trialType and studyDesign cannot be 100% relied upon, at least not here.Some trials do not have “check” vs. “test” distinguished in the “entryType.”
+#Some trials have only 1 replication.
+#Thus I will check if the replicate and blockNumber columns reliably distinguish complete and incomplete blocks in the data.
+MyArchidata %>% 
+     group_by(studyName) %>% 
+     summarize(N_replicate=length(unique(replicate)), 
+               N_blockNumber=length(unique(blockNumber))) %>%  
+     gt()
+##some trials have 2/3/4 replicate or the same replicate number as block number,  I decided to check that the replicate column means blocks, basically merge two summaries: (1) he overall number of accessions per trial, and (2) the average number of unique accessions per trial.
+MyArchidata %>% 
+  filter(!is.na(replicate)) %>%
+  filter(!is.na(germplasmName)) %>%
+  filter(observationLevel == "plot") %>%
+     group_by(studyName) %>% 
+#the overall number of accessions per trial
+     summarize(N_accession=length(germplasmName),
+  # the average unique number of accessions per trial
+  N_unique_accession=length(unique(germplasmName))) %>% 
+     gt() 
+ #he numbers are not similar for some trials, but not are for the others indicating the presence of replicated  and non replicated trials. For the replicated, the average unique number of accessions per trial should be a sub factor of the overall number
+#Just to check more, look at the min, mean and max number of accessions per block.
+
+MyArchidata %>%
+  filter(!is.na(replicate)) %>%
+     group_by(studyName) %>% 
+     summarize(N_accession=length(germplasmName)) %>% 
+     left_join(MyArchidata %>%
+  filter(!is.na(replicate)) %>% 
+     group_by(studyName,replicate, blockNumber) %>% 
+     summarize(N_accession=length(germplasmName)) %>% ungroup() %>% 
+     group_by(studyName) %>% 
+     summarize(minAccessionsPerBlock=ceiling(min(N_accession)),
+               avgAccessionsPerBlock=ceiling(mean(N_accession)),
+               maxAccessionsPerBlock=ceiling(max(N_accession)))) %>% 
+     gt()
+# Now I will create two variables (replicated and non replicated), indicating (TRUE/FALSE) whether to model using the replicate 
+#I also  create explicitly nested design variables (yearInLoc, trialInLocYr, repInTrial, blockInRep).
+MyArchidata %<>% 
+  filter(!is.na(replicate)) %>%
+  filter(!is.na(germplasmName)) %>%
+  filter(observationLevel == "plot") %>%
+     group_by(studyName) %>% 
+#the overall number of accessions per trial
+     summarize(N_accession=length(germplasmName),
+  # the average unique number of accessions per trial
+  N_unique_accession=length(unique(germplasmName))) %>% 
+  filter(N_unique_accession > 2) %>% 
+     ungroup() %>% 
+     mutate(Replicated=ifelse(N_accession>1.5*N_unique_accession,TRUE,FALSE),
+            non_Replicated=ifelse(N_accession<=N_unique_accession,TRUE,FALSE)) %>% 
+     left_join(MyArchidata) %>% #(>1.5 because of the death of some accessions in fields)
+     mutate(yearInLoc=paste0(programName,"_",Location,"_",Year),
+            trialInLocYr=paste0(yearInLoc,"_",studyName),
+            repInTrial=paste0(trialInLocYr,"_",replicate),
+            blockInrep=paste0(repInTrial,"_",blockNumber))
+write_csv(MyArchidata, "data/MyArchiphenotypes.csv", append = FALSE)
+saveRDS(MyArchidata,file=here::here("output","MyArchiphenotypes.rds"))
+#Just for checking
+# ALL <- MyArchidata %>% filter(Replicated == TRUE) 
+# unique(MyArchidata$replicate)
+#[1]  1  2  3  4 NA
+```
+
+
+
+#Data distribution previsualization
+```{r}
+ Architraits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture")
+
+Archidistri <- MyArchidata %>%
+     # Convert the data to "long format" 
+     pivot_longer(cols = all_of(Architraits), 
+                  names_to = "Trait", values_to = "ArchiValue") %>%
+     filter(!is.na(ArchiValue))
+
+Archidistri$trialType <- factor(Archidistri$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT")) # Reordering group factor levels
+Archidistri$Trait <- factor(Archidistri$Trait,      
+                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum", "PlantArchitecture"))
+
+ggplot(data = Archidistri,
+                             aes(x=trialType,y=ArchiValue, fill = Trait)) +
+  geom_boxplot(stat = "boxplot") +
+  stat_summary(fun=mean, na.rm = TRUE) +
+  labs(x= "Tria type", y= "Values") + theme_bw() +
+    facet_grid(Trait~trialType, scales = "free")
+```

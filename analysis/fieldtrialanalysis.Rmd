@@ -7,139 +7,415 @@ editor_options:
   chunk_output_type: console
 ---
 
-## 1. Download phenotypic traits from Cassavabase following these steps
-  a. I downloaded all traits with the words "branch"/"flower"/"stem/"/"fork"/"node"/"canopy"/"leaf area/"plant height" to make a list of my plant architecture trait called "Architect_trait. .  
-  b. Select the following `Trial Types` according to Luciano:
-      - *Clonal Evaluation*;
-      - *Preliminary Yield Trial*;
-      - *Advanced Yield Trial*;
-      - *Uniform Yield Trial*;
-      - *Regional Trials*;
-      - *phenotyping_trial*.
-   c. Select `Years` from 2010 to 2022.
-   d. Select all the `trials` available at cassavabase after the filter, download the phenotypic data as "Architect_trait.csv"
-   
-## 2. Phenotypic data Information: The objective is Find a way to choose the traits we will consider for genomic selection. Chek the list of the traits,the number of trials in which the traits were measured. It can be evaluated by programm 
-### Table 1: List of traits and their number of trials par Program and Year
+## check the number of each trait observations by trial. because most of the trials have less than the 3 traits observed. 
 ```{r}
-library(tidyverse); library(data.table); library(reshape2);  library(reactable); library(here)
-ArchiData_pheno <- read.csv(file = here::here("data", "Architect_trait.csv"), header = T, na.strings = "", skip = 2)
-ArchiData_meta <- read.csv(file = here::here("data", "Archimetadata.csv"), header = T, na.strings = "", skip = 2)
-ArchiData_meta <- ArchiData_meta %>% select(studyName, studyDescription,
-studyYear, studyDesign, locationDbId, locationName, trialType,
-plantingDate, harvestDate, plotWidth, plotLength, fieldSize,
-fieldTrialIsPlannedToBeGenotyped, fieldTrialIsPlannedToCross)
-ArchiData  <- left_join(ArchiData_pheno,ArchiData_meta )
-
-AchiData1 <- ArchiData %>% reshape2::melt(data = .,
-                                id.vars = c("studyYear", "programDbId", "programName", "programDescription",
-                                                            "studyDbId", "studyName", "trialType", "studyDesign", "plotWidth",
-                                                            "plotLength", "fieldSize", "fieldTrialIsPlannedToBeGenotyped",
-                                                            "fieldTrialIsPlannedToCross", "plantingDate", "harvestDate",
-                                                            "locationDbId", "locationName", "germplasmDbId", "germplasmName",
-                                                            "germplasmSynonyms", "observationLevel", "observationUnitDbId",
-                                                            "observationUnitName", "replicate", "blockNumber", "plotNumber",
-                                                            "rowNumber", "colNumber", "entryType", "plantNumber"),
-                                                variable.name = "Trait",
-                                                value.name = "Value") 
-AchiData2 <- AchiData1[!is.na(AchiData1$Value),]
-saveRDS(object = AchiData2, file = here::here("data", "ArchiPAGP.RDS"))## Why to save like that? Why not csv? let's continue to see. 
-ArchiDatap <- readRDS(here("data","ArchiPAGP.RDS"))
-ArchiData3 <- ArchiDatap %>% select(programName, studyYear, Trait, studyName) %>% unique()
-
-Table1 <- table(ArchiData3$programName, ArchiData3$studyYear, ArchiData3$Trait) %>% as.data.frame()
-colnames(Table1) <- c("programName", "Year", "Trait", "nb_Trials")
-Table1 <- Table1[Table1$`nb_Trials`!=0,] %>% 
-  filter(Trait %in% str_subset(Trait, "CO"))
-Table1 %>% reactable(groupBy = c("Trait", "programName"), columns = list(
-  "nb_Trials" = colDef(aggregate = "sum")), defaultPageSize = 15)
-write_csv(Table1, "output/Trait_Table1.csv")
-```
-## 3. This step is to filter the trait and keep those measured in more than 50 trials. I would filter up to 100 but some important traits related to flowering and stem have trials number under 100.
-### Table2: Table of trait with 50 trials or more 
-```{r}
-Table22 <- ArchiData3 %>% 
-  select(Trait, studyName) %>%
-  filter(Trait %in% str_subset(Trait, "CO")) %>%
-  group_by(Trait) %>% 
-  summarise(nb_Trials=n())
-Table2 <- Table22 %>% filter(nb_Trials >= 50)
+library(tidyverse); library(data.table); library(lme4); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm)
+MyArchiphenos <- read.csv("data/MyArchiphenotypes.csv")
+#The pipeline version of this analysis will use the TRUE/FALSE values of CompleteBlocks and IncompleteBlocks (Preliminary analysis of trial data ).
+MyArchiphenos  %>% 
+     count(Replicated,non_Replicated,Location) %>% 
+     spread(Location,n)
 ```
 
-## 4. Making my data set with with the selected trait
-
+#Convert the data to “long format” . Remove missing values. “Nest” the data by Trait.
 ```{r}
-Mytraits <- Table2 %>% select(Trait) %>% as.data.frame() 
-Mytraits <- transpose(Mytraits)
-names(Mytraits) <- as.character(unlist(Mytraits[1,]))
-MyArchidata <- ArchiData %>% select(all_of(colnames(Mytraits)), studyYear, programName, studyName, trialType, studyDesign, plotWidth, plotLength, locationName, germplasmName,replicate, blockNumber, plotNumber, plantNumber) %>% mutate(BranchlevelNum = branching.level.counting.CO_334.0000079,                    
-FirstBranchHeight = first.apical.branch.height.measurement.in.cm.CO_334.0000106,
-FlowerVisRate = flowering.ability.visual.assessment.0.3.CO_334.0000233,     
-PlantArchitecture = plant.architecture.visual.rating.1.5.CO_334.0000099,        
-PlantHeight = plant.height.measurement.in.cm.CO_334.0000018,              
-PlantHeightLeaf = plant.height.with.leaf.in.cm.CO_334.0000123,                
-StemNum = stem.number.counting.CO_334.0000129,
-Location = locationName,
-Year = studyYear,
-trialType = case_when(trialType == "Uniform Yield Trial" ~ "UYT",
-                      trialType == "Clonal Evaluation" ~ "CET",
-                      trialType == "Advanced Yield Trial" ~ "AYT",
-                      trialType == "Preliminary Yield Trial" ~ "PYT",
-                      trialType == "Regional Trials" ~ "RT",
-                      trialType == "phenotyping_trial" ~ "PeT"),
-Periode = ifelse(Year <= 2015,
-                                  yes = "Before_2015",
-                                  no = "After_2015"),
-
-                     .keep = "unused") %>% 
-  filter(!(is.na(trialType))) %>% 
-  mutate(BranchlevelNum = as.numeric(BranchlevelNum),
-         FlowerVisRate = as.numeric(FlowerVisRate),
-         PlantArchitecture = as.numeric(PlantArchitecture),
-         PlantHeightLeaf = round(as.numeric(PlantHeightLeaf), digits = 1),
-         PlantHeight = round(as.numeric(PlantHeight), digits = 1),
-         FirstBranchHeight = round(as.numeric(FirstBranchHeight), digits = 1),
-         StemNum = as.numeric(StemNum)) %>%
-  filter(PlantHeight < 1000 | is.na(PlantHeight)) %>%
-  filter(BranchlevelNum < 10 | is.na(BranchlevelNum)) %>%
-  filter(FirstBranchHeight < 600 | is.na(FirstBranchHeight)) %>%
-  filter(StemNum < 10 | is.na(StemNum)) 
-```
-
-Data distribution visualization
-```{r}
- ArchiQuanttraits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantHeightLeaf", "StemNum")
-
-ArchiQuantdistri <- MyArchidata %>%
+ArchiTRaits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture")
+MyArchiphenos <- MyArchiphenos %>% 
      # Convert the data to "long format" 
-     pivot_longer(cols = all_of(ArchiQuanttraits), 
-                  names_to = "Trait", values_to = "ArchiQuantValue") %>%
-     filter(!is.na(ArchiQuantValue))
+     pivot_longer(cols = all_of(ArchiTRaits), 
+                  names_to = "ArchiTRait", values_to = "ArchiValue") %>%
+     # Remove missing values 
+     filter(!is.na(ArchiValue)) %>% 
+   filter(!is.na(replicate)) %>% 
+     filter(!is.na(germplasmName))
+```
 
-ArchiQuantdistri$trialType <- factor(ArchiQuantdistri$trialType, 
-                                      levels = c("CET", "PYT", "AYT", "UYT", "PeT", "RT")) # Reordering group factor levels
-ArchiQuantdistri$Trait <- factor(ArchiQuantdistri$Trait,      
-                        levels = c("PlantHeight", "PlantHeightLeaf", "FirstBranchHeight", "BranchlevelNum", "StemNum"))
+##Fit models for replicated trials 
+```{r}
+MyArchiphenos_replicated <- MyArchiphenos %>% filter(Replicated == TRUE)
+To_remove <- MyArchiphenos_replicated  %>% group_by(studyName) %>% 
+     summarize(N_unique_accession=length(unique(germplasmName)),
+               N_unique_replicate=length(unique(replicate))) %>%
+  filter(N_unique_accession == 1 | N_unique_replicate == 1) %>% dplyr::select(studyName)
+Toremove <- To_remove$studyName
+MyArchiphenos_replicated <- MyArchiphenos_replicated %>% dplyr::filter(!studyName %in% Toremove)#this MyArchi.. took to remove outliers
+ArchiTRials <- MyArchiphenos_replicated$studyName %>% table %>% .[order(.)] %>% names
+ 
+i <- ArchiTRaits[1]
+j <- ArchiTRials[1]
+results <- tibble()
+results_stu <- tibble()
+for(i in ArchiTRaits){
+ for(j in ArchiTRials){
+     Data <- MyArchiphenos_replicated %>% 
+       filter(studyName == j, ArchiTRait == i)
+     if(nrow(Data) > 1){
+     try(MixedModels <- lmer(ArchiValue ~ repInTrial+ (1|germplasmName), data = Data))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(Trait = i,
+                      Trial = j,
+                          VarG = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[2,2],
+                      
+                      Mean = as.data.frame(fixef(MixedModels))[1,],
+                      H2 = round(VarG/(VarG + VarE/meanNreps),1),
+                      CV = sigma(MixedModels)/Mean,
+                      PEV = mean((se.ranef(MixedModels)$germplasmName[,1])^2),
+                      Ac = round((1-PEV/VarG)^(1/2),1)))
+ ##Calculate Studentized Residuals
+ try(stud_resids <- tibble(StResiduals = stats::rstudent(MixedModels),
+     germplasmName = Data$germplasmName))
+ ##Bind all results
+     try(results <- bind_rows(results, result))
+ try(results_stu <- bind_rows(results_stu, stud_resids))
+     rm(MixedModels); rm(result); rm(stud_resids)
+     }
+ }
+ }
+results
+results_stu
+write.table(results, file = "Result/MixedModel_replicated.csv", quote = F, sep =",",
+            row.names = F)
+write.table(results_stu, file = "data/St_residuall_replicated.csv", quote = F, sep =",",
+            row.names = F)
+```
 
-ggplot(data = ArchiQuantdistri,
-                             aes(x=trialType,y=ArchiQuantValue, fill = Trait)) +
+# Filter trials for identify trials with low heritability (H2 < 0.1) and/or low accuracy (Ac < 0.4) for all the traits, then, removes the outliers with residual value > 3.
+```{r}
+#add studentized residuals to orignal dataset
+results_stu <- read.csv("data/St_residuall_replicated.csv")
+MyArchiphenos_replicated_St <- cbind(MyArchiphenos_replicated, results_stu['StResiduals'])
+write.table(MyArchiphenos_replicated_St, file = "data/MyArchiphenos_replicated_St.csv", quote = F, sep =",", row.names = F)
+#Filter with H2 and Ac
+results <- read.csv("Result/MixedModel_replicated.csv")
+# Visualize the distribution 
+results <- results %>% filter(!is.na(H2) & H2 < 1 & H2 != 0) %>% filter(!is.na(Ac) & Ac < 1 & H2 != 0)#VarG/H2 > 1 for high replicate level (> accession number? but = 6,10,9 ...)
+plot(results$H2, results$Ac) # It is a challenge to chose the value of H2 and AC
+Trials_replicated_to_remove <- results %>% filter(H2 <= 0.1 | H2 >= 1 | Ac <= 0.4) %>% dplyr::select(Trial)#Should I remove the trials by trait? since a given trial can be in the "remove position" for 1 trait but be in the "stay position" for another trait. 
+ArchiTRaits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture")
+# Make a list of trial to remove per trait
+for(i in ArchiTRaits){
+  subdata <- results %>% filter(Trait == i) %>% 
+  filter(H2 <= 0.1 | H2 >= 1 | Ac <= 0.4) %>% dplyr::select(Trial)
+   paste(ArchiTRaits[i] <- subdata)}
+
+Listfor_BranchlevelNum <- ArchiTRaits$BranchlevelNum
+remove_for_BranchlevelNum <- MyArchiphenos_replicated_St %>% dplyr::filter(ArchiTRait == "BranchlevelNum") %>% dplyr::filter(!studyName %in% Listfor_BranchlevelNum)
+
+Listfor_FirstBranchHeight <- ArchiTRaits$FirstBranchHeight
+remove_for_FirstBranchHeight <- MyArchiphenos_replicated_St %>% dplyr::filter(ArchiTRait == "FirstBranchHeight") %>% dplyr::filter(!studyName %in% Listfor_FirstBranchHeight)
+
+Listfor_PlantHeight <- ArchiTRaits$PlantHeight
+remove_for_PlantHeight <- MyArchiphenos_replicated_St %>% dplyr::filter(ArchiTRait == "PlantHeight") %>% dplyr::filter(!studyName %in% Listfor_PlantHeight)
+
+Listfor_PlantArchitecture <- ArchiTRaits$PlantArchitecture
+remove_for_PlantArchitecture <- MyArchiphenos_replicated_St %>% dplyr::filter(ArchiTRait == "PlantArchitecture") %>% dplyr::filter(!studyName %in% Listfor_PlantArchitecture)
+
+MyArchiphenos_replicated_filt <- bind_rows(remove_for_BranchlevelNum, remove_for_FirstBranchHeight, remove_for_PlantHeight, remove_for_PlantArchitecture)
+
+# remove the outliers 
+plot(MyArchiphenos_replicated_filt$StResiduals)
+outliers <- which(abs(scale(MyArchiphenos_replicated_filt$StResiduals)) > 4)
+MyArchiphenos_replicated_filtered <- MyArchiphenos_replicated_filt[-outliers,]
+write.table(MyArchiphenos_replicated_filtered, file = "data/MyArchiphenos_replicated_filtered.csv", quote = F, sep =",",row.names = F)
+#plot(MyArchiphenos_replicated_filtered$StResiduals)
+```
+
+##Fit models for the non_replicated trials: Fit a model only with the check, thus the replication will be the block
+```{r}
+MyArchiphenos_non_rep <- MyArchiphenos %>% filter(Replicated == FALSE) %>% filter(entryType == "check")
+To_remove <- MyArchiphenos_non_rep  %>% group_by(studyName) %>% 
+     summarize(N_unique_accession=length(unique(germplasmName)),
+               N_unique_bloc=length(unique(blockNumber))) %>%
+  filter(N_unique_accession == 1 | N_unique_bloc == 1) %>% dplyr::select(studyName)
+Toremove <- To_remove$studyName
+MyArchiphenos_non_rep <- MyArchiphenos_non_rep %>% dplyr::filter(!studyName %in% Toremove)
+#germplasmtoremove <- MyArchiphenos_non_rep  %>% group_by(studyName, germplasmName) %>% summarize(N_observation = length(germplasmName)) %>% filter(N_observation == 1) #to check the trials including germplasm with 1 value
+#germplasmtoremove_trials <- germplasmtoremove$studyName
+#germplasmtoremove_germ <- germplasmtoremove$germplasmName
+#MyArchiphenos_non_rep <- MyArchiphenos_non_rep %>% filter((!studyName %in% germplasmtoremove_trials) & (!germplasmName %in% germplasmtoremove_germ))
+ 
+ArchiTRials <- MyArchiphenos_non_rep %>% dplyr::select(studyName) %>% table %>% .[order(.)] %>% names
+
+i <- ArchiTRaits[1]
+j <- ArchiTRials[1]
+results <- tibble()
+results_stu <- tibble()
+for(i in ArchiTRaits){
+ for(j in ArchiTRials){
+     Data <- MyArchiphenos_non_rep %>% 
+       filter(studyName == j, ArchiTRait == i) %>%
+       filter(!is.na(ArchiValue))
+     if(nrow(Data) > 1){
+     MixedModels <- lmer(ArchiValue ~ blockInrep+ (1|germplasmName), data = Data)
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ result <- tibble(Trait = i,
+                      Trial = j,
+                          VarG = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[2,2],
+                      Mean = as.data.frame(fixef(MixedModels))[1,],
+                      H2 = round(VarG/(VarG + VarE/meanNreps),1),
+                      CV = sigma(MixedModels)/Mean,
+                      PEV = mean((se.ranef(MixedModels)$germplasmName[,1])^2),
+                      Ac = round((1-PEV/VarG)^(1/2),1)
+ )
+##Calculate Studentized Residuals
+ stud_resids <- tibble(StResiduals = stats::rstudent(MixedModels),
+     germplasmName = Data$germplasmName)
+ ##Bind all results
+ results <- bind_rows(results, result)
+ results_stu <- bind_rows(results_stu, stud_resids)
+     #rm(MixedModels); rm(result); rm(stud_resids)
+     }
+ }
+ }
+results
+results_stu
+write.table(results, file = "Result/MixedModel_non_replicated.csv", quote = F, sep =",", row.names = F)
+write.table(results_stu, file = "data/St_residual_non_replicated.csv", quote = F, sep =",", row.names = F)
+#Error : number of levels of each grouping factor must be < number of observations (problems: germplasmName)
+#Error in VarCorr(MixedModels) : object 'MixedModels' not found and Error in list2(...) : object 'result' not found are for are for the where the traits are not measured
+#VarG > 1 for high blocs level (> accession number? but = 6,10,9 ...)
+```
+
+# Filter trials for identify trials with low heritability (H2 < 0.1) and/or low accuracy (Ac < 0.4) for all the traits
+```{r}
+#add studentized residuals to orignal dataset: I wwill not remove outliers since we worked with only the checks
+#results_stu <- read.csv("data/St_residuall_replicated.csv")
+#MyArchiphenos_replicated_St <- cbind(MyArchiphenos_replicated, results_stu['StResiduals'])
+#write.table(MyArchiphenos_replicated_St, file = "data/MyArchiphenos_replicated_St.csv", quote = F, sep =",", row.names = F)
+#Filter with H2 and Ac
+results <- read.csv("Result/MixedModel_replicated.csv")
+# Visualize the distribution 
+results <- results %>% filter(!is.na(H2) & H2 < 1 & H2 != 0) %>% filter(!is.na(Ac) & Ac < 1 & H2 != 0)#VarG/H2 > 1 for high replicate level (> accession number? but = 6,10,9 ...)
+plot(results$H2, results$Ac) # It is a challenge to chose the value of H2 and AC
+Trials_replicated_to_remove <- results %>% filter(H2 <= 0.1 | H2 >= 1 | Ac <= 0.4) %>% dplyr::select(Trial)#Should I remove the trials by trait? since a given trial can be in the "remove position" for 1 trait but be in the "stay position" for another trait. 
+ArchiTRaits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture")
+# Make a list of trial to remove per trait
+for(i in ArchiTRaits){
+  subdata <- results %>% filter(Trait == i) %>% 
+  filter(H2 <= 0.1 | H2 >= 1 | Ac <= 0.4) %>% dplyr::select(Trial)
+   paste(ArchiTRaits[i] <- subdata)}
+
+Listfor_BranchlevelNum <- ArchiTRaits$BranchlevelNum
+remove_for_BranchlevelNum <- MyArchiphenos_non_rep %>% dplyr::filter(ArchiTRait == "BranchlevelNum") %>% dplyr::filter(!studyName %in% Listfor_BranchlevelNum)
+
+Listfor_FirstBranchHeight <- ArchiTRaits$FirstBranchHeight
+remove_for_FirstBranchHeight <-MyArchiphenos_non_rep %>% dplyr::filter(ArchiTRait == "FirstBranchHeight") %>% dplyr::filter(!studyName %in% Listfor_FirstBranchHeight)
+
+Listfor_PlantHeight <- ArchiTRaits$PlantHeight
+remove_for_PlantHeight <- MyArchiphenos_non_rep %>% dplyr::filter(ArchiTRait == "PlantHeight") %>% dplyr::filter(!studyName %in% Listfor_PlantHeight)
+
+Listfor_PlantArchitecture <- ArchiTRaits$PlantArchitecture
+remove_for_PlantArchitecture <- MyArchiphenos_non_rep %>% dplyr::filter(ArchiTRait == "PlantArchitecture") %>% dplyr::filter(!studyName %in% Listfor_PlantArchitecture)
+#I will not forget the trials(remove) for those they were not fited.I should do that by trait. I will skip it because it is only 31 rows(trials?15,...)
+#List <- unique(results$Trial)
+#remove <- MyArchiphenos_non_rep %>% dplyr::filter(!studyName %in% List)
+
+MyArchiphenos_replicated_filt <- bind_rows(remove_for_BranchlevelNum, remove_for_FirstBranchHeight, remove_for_PlantHeight, remove_for_PlantArchitecture)
+# remove the outliers # I can not remove the outliers
+#plot(results_stu$StResiduals)
+#outliers <- which(abs(scale(MyArchiphenos_replicated_filt$StResiduals))>4)
+#MyArchiphenos_replicated_filtered <- MyArchiphenos_replicated_filt[-outliers,]
+
+```
+#My final pheno data is to bin the replicated and non_replicated
+```{r}
+
+```
+
+## Run the model for each trait separately
+#BranchlevelNum"
+```{r}
+MyArchiphenos_replicated <- MyArchiphenos %>% filter(Replicated == TRUE)
+ArchiTRials <- MyArchiphenos_replicated %>% filter(!is.na(BranchlevelNum)) %>% dplyr::select(studyName) %>% table %>% .[order(.)] %>% names
+
+j <- ArchiTRials[1]
+results <- tibble()
+for(j in ArchiTRials){
+     Data <- MyArchiphenos_replicated  %>% 
+       filter(!is.na(BranchlevelNum), BranchlevelNum !=0) %>%
+   filter(!is.na(replicate)) %>% 
+     filter(!is.na(germplasmName)) %>% 
+       filter(studyName == j)
+     if(nrow(Data) != 0){
+     try(MixedModels_BranchlevelNum <- lmer(BranchlevelNum ~ blockInrep + (1|germplasmName), data = Data))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(Trials = j,
+                          VarG = as.data.frame(VarCorr(MixedModels_BranchlevelNum))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels_BranchlevelNum))[,c("grp","vcov")] %>% .[2,2],
+                      #VarRes = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[3,2],
+                      Mean = as.data.frame(fixef(MixedModels_BranchlevelNum))[1,],
+                      H2 = VarG/(VarG + VarE/meanNreps),
+                      CV = sigma(MixedModels_BranchlevelNum)/Mean, 
+                      PEV = mean((se.ranef(MixedModels_BranchlevelNum)$germplasmName[,1])^2), 
+                      Ac = (1-PEV/VarG)^(1/2),
+                      Trait = "BranchlevelNum"
+                      #Real = suppressWarnings(MuMIn::r.squaredGLMM(MixedModel_PlantHeight)[2]),Thus, Ac = accuracy of the individual prediction = Reliability^(1/2) of each BLUP value. 
+ ))
+     try(results <- bind_rows(results, result))
+     #rm(MixedModels); rm(result); rm(MixedModelsrd)
+     }
+ }
+results_BranchlevelNum
+
+```
+
+#PlantArchitecture"
+```{r}
+MyArchiphenos_non_rep <- MyArchiphenos %>% filter(Replicated == FALSE) %>% filter(entryType == "check") %>% dplyr::select(-c(N_unique_accession, N_accession))
+## Remove trials with only one check and with non replicate check.
+To_remove <- MyArchiphenos_non_rep  %>% group_by(studyName) %>% 
+     summarize(N_unique_accession=length(unique(germplasmName)),
+               N_unique_bloc=length(unique(blockNumber))) %>%
+  filter(N_unique_accession == 1 | N_unique_bloc == 1) %>% dplyr::select(studyName)
+Toremove <- To_remove$studyName
+MyArchiphenos_non_rep <- MyArchiphenos_non_rep %>% dplyr::filter(!studyName %in% Toremove)
+
+ArchiTRials <- MyArchiphenos_non_rep %>% filter(!is.na(PlantArchitecture)) %>% dplyr::select(studyName) %>% table %>% .[order(.)] %>% names
+
+j <- ArchiTRials[1]
+results <- tibble()
+for(j in ArchiTRials){
+     Data <- MyArchiphenos_non_rep %>% 
+       filter(!is.na(PlantArchitecture), PlantArchitecture !=0) %>%
+   filter(!is.na(replicate)) %>% 
+     filter(!is.na(germplasmName)) %>% 
+       filter(studyName == 	"19introLatAmeumu")
+     if(nrow(Data) != 0){
+     try(MixedModels_PlantArchitecture <- lmer(PlantArchitecture ~ blockInrep + (1|germplasmName), data = Data))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(Trials = j,
+                          VarG = as.data.frame(VarCorr(MixedModels_PlantArchitecture))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels_PlantArchitecture))[,c("grp","vcov")] %>% .[2,2],
+                      #VarRes = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[3,2],
+                      Mean = as.data.frame(fixef(MixedModels_PlantArchitecture))[1,],
+                      H2 = VarG/(VarG + VarE/meanNreps),
+                      CV = sigma(MixedModels_PlantArchitecture)/Mean, 
+                      PEV = mean((se.ranef(MixedModels_PlantArchitecture)$germplasmName[,1])^2), 
+                      Ac = (1-PEV/VarG)^(1/2),
+                      Trait = "PlantArchitecture"
+                      #Real = suppressWarnings(MuMIn::r.squaredGLMM(MixedModel_PlantHeight)[2]),Thus, Ac = accuracy of the individual prediction = Reliability^(1/2) of each BLUP value. 
+ ))
+     try(results <- bind_rows(results, result))
+     #rm(MixedModels); rm(result); rm(MixedModelsrd)
+     }
+ }
+
+results_PlantArchitecture
+
+#write.table(results2, file = "Result/MeansVarCompMixedModels.csv", quote = F,
+ #           sep = ",", row.names = F)
+```
+
+#FirstBranchHeight
+```{r}
+MyArchiphenos_replicated <- MyArchiphenos %>% filter(Replicated == TRUE)
+
+ArchiTRials <- MyArchiphenos_replicated %>% filter(!is.na(FirstBranchHeight), FirstBranchHeight !=0) %>% filter(!is.na(germplasmName)) %>% dplyr::select(studyName) %>% table %>% .[order(.)] %>% names
+
+
+j <- ArchiTRials[1]
+results <- tibble()
+for(j in ArchiTRials){
+     Data <- MyArchiphenos_replicated %>% 
+       filter(!is.na(FirstBranchHeight), FirstBranchHeight !=0) %>%
+   filter(!is.na(replicate)) %>% 
+     filter(!is.na(germplasmName)) %>% 
+       filter(studyName ==	"19.GS.C4B.PYT.135.UB")
+     if(nrow(Data) != 0){
+     try(MixedModels_FirstBranchHeight <- lmer(FirstBranchHeight ~ blockInrep + (1|germplasmName), data = Data))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(Trials = j,
+                          VarG = as.data.frame(VarCorr(MixedModels_FirstBranchHeight))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels_FirstBranchHeight))[,c("grp","vcov")] %>% .[2,2],
+                      #VarRes = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[3,2],
+                      Mean = as.data.frame(fixef(MixedModels_FirstBranchHeight))[1,],
+                      H2 = VarG/(VarG + VarE/meanNreps),
+                      CV = sigma(MixedModels_FirstBranchHeight)/Mean, 
+                      PEV = mean((se.ranef(MixedModels_FirstBranchHeight)$germplasmName[,1])^2), 
+                      Ac = (1-PEV/VarG)^(1/2),
+                      Trait = "FirstBranchHeight"
+                      #Real = suppressWarnings(MuMIn::r.squaredGLMM(MixedModel_PlantHeight)[2]),Thus, Ac = accuracy of the individual prediction = Reliability^(1/2) of each BLUP value. 
+ ))
+     try(results <- bind_rows(results, result))
+     #rm(MixedModels); rm(result); rm(MixedModelsrd)
+     }
+ }
+
+results_FirstBranchHeight
+      
+#write.table(results2, file = "Result/MeansVarCompMixedModels.csv", quote = F,
+ #           sep = ",", row.names = F)
+```
+#PlantHeight"
+```{r}
+MyArchiphenos_non_rep <- MyArchiphenos %>% filter(Replicated == FALSE) %>% filter(entryType == "check") %>% dplyr::select(-c(N_unique_accession, N_accession))
+## Remove trials with only one check and with non replicate check.
+To_remove <- MyArchiphenos_non_rep  %>% group_by(studyName) %>% 
+     summarize(N_unique_accession=length(unique(germplasmName)),
+               N_unique_bloc=length(unique(blockNumber))) %>%
+  filter(N_unique_accession == 1 | N_unique_bloc == 1) %>% dplyr::select(studyName)
+Toremove <- To_remove$studyName
+MyArchiphenos_non_rep <- MyArchiphenos_non_rep %>% dplyr::filter(!studyName %in% Toremove)
+
+ArchiTRials <- MyArchiphenos_non_rep %>% filter(!is.na(PlantHeight)) %>% dplyr::select(studyName) %>% table %>% .[order(.)] %>% names
+
+j <- ArchiTRials[1]
+results <- tibble()
+for(j in ArchiTRials){
+     Data <- MyArchiphenos_non_rep  %>% 
+       filter(!is.na(PlantHeight), PlantHeight !=0) %>%
+   filter(!is.na(replicate)) %>% 
+     filter(!is.na(germplasmName)) %>% 
+       filter(studyName == j)
+     if(nrow(Data) > 1){
+     try(MixedModels_PlantHeight <- lmer(PlantHeight ~ blockInrep + (1| germplasmName), data = Data))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(Trials = j,
+                          VarG = as.data.frame(VarCorr(MixedModels_PlantHeight))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(VarCorr(MixedModels_PlantHeight))[,c("grp","vcov")] %>% .[2,2],
+                      #VarRes = as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[3,2],
+                      Mean = as.data.frame(fixef(MixedModels_PlantHeight))[1,],
+                      H2 = VarG/(VarG + VarE/meanNreps),
+                      CV = sigma(MixedModels_PlantHeight)/Mean, 
+                      PEV = mean((se.ranef(MixedModels_PlantHeight)$germplasmName[,1])^2), 
+                      Ac = (1-PEV/VarG)^(1/2),
+                      Trait = "PlantHeight"
+                      #Real = suppressWarnings(MuMIn::r.squaredGLMM(MixedModel_PlantHeight)[2]),Thus, Ac = accuracy of the individual prediction = Reliability^(1/2) of each BLUP value. 
+ ))
+     try(results <- bind_rows(results, result))
+     #rm(MixedModels); rm(result); rm(MixedModelsrd)
+     }
+ }
+results_PlantHeight
+# Error : number of levels of each grouping factor must be < number of observations (problems: germplasmName) is because all the accessions have only one observation per block ("21_YellowFreshAyt31_Namulonge"). boundary (singular) fit: see help('isSingular') is for the very low genetic variation ("19C2bCETnonGSumu"). Ex #"14.GS.C1.EC.329.MK", 
+
+#write.table(results_PlantHeight, file = "Result/MixedModelResults.csv", quote = F, sep =",",
+        #    row.names = F)
+```
+#Data distribution visualization with replicated anf filtered trials trials and outliers removed
+```{r}
+MyArchiphenos_replicated_filtered <-  read.csv("data/MyArchiphenos_replicated_filtered.csv")
+#Architraits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture")
+
+MyArchiphenos_replicated_filtered$trialType <- factor(MyArchiphenos_replicated_filtered$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT")) # Reordering group factor levels
+MyArchiphenos_replicated_filtered$ArchiTRait <- factor(MyArchiphenos_replicated_filtered$ArchiTRait,      
+                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum", "PlantArchitecture"))
+#Why AM I still having a big outlier with plantheight so I added my hand removing
+MyArchiphenos_replicated_filtered <- MyArchiphenos_replicated_filtered %>% filter(!ArchiTRait == "PlantArchitecture")
+ggplot(data = MyArchiphenos_replicated_filtered,
+                             aes(x=trialType,y=ArchiValue, fill = ArchiTRait)) +
   geom_boxplot(stat = "boxplot") +
   stat_summary(fun=mean, na.rm = TRUE) +
   labs(x= "Tria type", y= "Values") + theme_bw() +
-    facet_grid(Trait~trialType, scales = "free")
-
-#For qualitative trait
-MyArchidata$trialType <- factor(MyArchidata$trialType, 
-                                      levels = c("CET", "PYT", "AYT", "UYT", "PeT", "RT"))
-
-ggplot(MyArchidata, aes(x = FlowerVisRate, fill = trialType)) +
-   geom_bar(position = "dodge") +
-   xlim(0,6) +
-   labs(x= "FlowerVisRate", y= "Value") + theme_bw()
-
-ggplot(MyArchidata, aes(x = PlantArchitecture, fill = trialType)) +
-   geom_bar(position = "dodge") +
-   xlim(0,6) +
-   labs(x= "PlantArchitecture", y= "Value") + theme_bw()
+    facet_grid(ArchiTRait~trialType, scales = "free")
 ```
 

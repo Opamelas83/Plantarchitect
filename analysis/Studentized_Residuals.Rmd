@@ -1,0 +1,73 @@
+---
+title: "Studentized_Residuals"
+author: "Opamelas83"
+date: "2023-02-22"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## build LMM 
+```{r}
+library(tidyverse); library(data.table); library(lme4); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm); library(MASS)
+MyArchidata <- read.csv("data/MyArchidata.csv")
+#Create unique ID for year and location
+ MyArchidata <- MyArchidata %>%
+   mutate(yearInLoc=paste0(programName,"_",Location,"_",Year),
+          trialInLocYr=paste0(yearInLoc,"_",studyName),
+          repInTrial=paste0(trialInLocYr,"_",replicate))
+
+ArchiTRaits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture")
+
+Archiphenos <- MyArchidata %>%
+     pivot_longer(cols = all_of(ArchiTRaits), 
+                  names_to = "Trait", values_to = "ArchiValue") %>%
+     filter(!is.na(ArchiValue)) 
+
+i <- ArchiTRaits[1]
+results <- tibble()
+for(i in ArchiTRaits){
+     Data <- Archiphenos %>% 
+       filter(Trait == i)
+     if(nrow(Data) != 0){
+     try(MixedModel_general <- lmer(PlantArchitecture ~ yearInLoc + (1|repInTrial) + (1|germplasmName), data = MyArchidata))
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ VarG <- as.data.frame(VarCorr(MixedModel_general))[,c("grp","vcov")] %>% .[1,2]
+ VarE <- as.data.frame(VarCorr(MixedModel_general))[,c("grp","vcov")] %>% .[2,2]
+ VarRes <- as.data.frame(VarCorr(MixedModel_general))[,c("grp","vcov")] %>% .[3,2]
+ Mean <- as.data.frame(fixef(MixedModel_general))[1,]
+ H2 <- VarG/(VarG + VarE/meanNreps)
+ CV <- sigma(MixedModel_general)/Mean 
+ PEV <- (se.ranef(MixedModel_general)$germplasmName[,1])^2
+ BLUP <- ranef(MixedModel_general, condVar=TRUE)[["germplasmName"]]
+ blup <- tibble(GermplasmName=rownames(BLUP),BLUP=BLUP$`(Intercept)`,PEV=PEV) %>%
+        mutate(REL=1-PEV/VarG,
+               drgBLUP=BLUP/REL,
+               WT=(1-H2)/((0.1 + (1-REL)/REL)*H2)) 
+out <- tibble(H2 = round(H2, digits = 2),
+                    BLUPs = list(blup))
+    return(out)
+     }
+ }
+
+results 
+write.table(results, file = "Result/MMgeneral.csv", quote = F, sep =",",
+            row.names = F)
+
+```
+
+```{r}
+#calculate studentized residuals
+#Archi_stud_resids <- MASS::studres(MixedModel_general) #It seems like it is for simple linear model
+Archi_stud_resids <- stats::rstudent(MixedModel_general) #extracts studentized residuals
+ArchiTRials <- Archiphenos$studyName %>% table %>% .[order(.)] %>% names
+#plot predictor variable vs. studentized residuals
+
+PlantArchit_Data <- MyArchidata %>% filter(!is.na(germplasmName) & !is.na(PlantArchitecture) & PlantArchitecture !=0)
+plot(Archi_stud_resids)
+plot(Archi_stud_resids ~ hatvalues(MixedModel_general))
+#ArchiTRials <- Archiphenos$studyName %>% table %>% .[order(.)] %>%
+#plot(PlantArchit_Data, Archi_stud_resids,  ylab='Studentized Residuals', xlab='PlantArchitecture')
+```
+
