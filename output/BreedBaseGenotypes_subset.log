@@ -1,0 +1,25 @@
+PLINK v1.90b7 64-bit (16 Jan 2023)
+Options in effect:
+  --bfile VCF/BreedBaseGenotypes_subset
+  --genome
+  --out ../output/BreedBaseGenotypes_subset
+
+Hostname: AG-PBG-92GML7L
+Working directory: /Users/mo367/Desktop/Analy_project/Plantarchitect/data
+Start time: Fri Apr 28 15:24:47 2023
+
+Random number seed: 1682709887
+16384 MB RAM detected; reserving 8192 MB for main workspace.
+61239 variants loaded from .bim file.
+9930 people (0 males, 0 females, 9930 ambiguous) loaded from .fam.
+Ambiguous sex IDs written to ../output/BreedBaseGenotypes_subset.nosex .
+Using up to 8 threads (change this with --threads).
+Before main variant filters, 9930 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+Total genotyping rate is exactly 1.
+61239 variants and 9930 people pass filters and QC.
+Note: No phenotypes present.
+IBD calculations complete.
+Finished writing ../output/BreedBaseGenotypes_subset.genome .
+
+End time: Fri Apr 28 15:26:09 2023

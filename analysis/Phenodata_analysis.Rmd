@@ -1,0 +1,389 @@
+---
+title: "Phenodata_analysis"
+author: "Opamelas83"
+date: "2023-03-14"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## Introduction
+
+```{r}
+library(tidyverse); library(data.table); library(lme4); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm); library(gt); library(corrplot); library(reactable); library(ggpubr); library(rstatix)
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
+MyArchiphenos_final %>% dplyr::select(programName, Year, ArchiTRait, studyName) %>% unique() -> SummaryData1
+SummaryData2 <- table(SummaryData1$ArchiTRait, SummaryData1$programName, SummaryData1$Year) %>% as.data.frame()
+colnames(SummaryData2) <- c("ArchiTRait", "programName", "Year", "nb_Trials")
+SummaryData2 <- SummaryData2[SummaryData2$`nb_Trials`!=0,]
+SummaryData3 <- SummaryData2 %>% reactable(groupBy = c("ArchiTRait", "programName", "Year"), columns = list(
+  "nb_Trials" = colDef(aggregate = "sum")), defaultPageSize = 15)
+#New for presentation
+SummaryData_present <- SummaryData2 %>% 
+  group_by(ArchiTRait) %>%
+  summarise(programName = length(unique(programName)),
+            Year = length(Year), 
+            nb_Trials = length(nb_Trials))
+#reactablefmtr::save_reactable_test(SummaryData2, "SummaryData.html")
+#reactablefmtr::save_reactable_test(SummaryData2, "SummaryData.png")
+```
+
+#Data distribution visualization with replicated anf filtered trials trials and outliers removed
+```{r}
+MyArchiphenos_finalf <- MyArchiphenos_final %>% filter(ArchiTRait %in% c("PlantHeight", "FirstBranchHeight", "BranchlevelNum")) %>% rename(Trait = ArchiTRait) #"PlantArchitecture"
+MyArchiphenos_finalf$trialType <- factor(MyArchiphenos_finalf$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT"))
+# Reordering group factor levels
+MyArchiphenos_finalf$Trait <- factor(MyArchiphenos_finalf$Trait,      
+                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum"))#"PlantArchitecture"
+jpeg(filename = "Traits distribution1.jpeg")
+AE <- ggplot(data = MyArchiphenos_finalf,
+                             aes(x=trialType,y=ArchiValue, fill = Trait)) +
+  geom_boxplot(stat = "boxplot") +
+  stat_summary(fun=mean, na.rm = TRUE) +
+  labs(x= "Tria type", y= "Values") + theme_bw() +
+    facet_grid(Trait~trialType, scales = "free") +
+  geom_text(data = MyArchiphenos_finalf,
+            aes(label = ArchiValue, y = ArchiValue + 0.08)) +
+  theme(legend.position='none')
+dev.off()
+# For each trait 
+#MyArchiphenos_finalf_plantheight <- MyArchiphenos_finalf %>% filter(Trait == "PlantHeight")
+#Archivalue_plantheight <- #MyArchiphenos_finalf_plantheight$ArchiValue
+#MyArchiphenos_finalf_FirstBranchHeight <- MyArchiphenos_finalf %>% filter(Trait == "FirstBranchHeight")
+#Archivalue_FirstBranchHeight <- MyArchiphenos_finalf_FirstBranchHeight$ArchiValue
+#MyArchiphenos_finalf_BranchlevelNum <- MyArchiphenos_finalf %>% filter(Trait == "BranchlevelNum")
+#Archivalue_BranchlevelNum <- MyArchiphenos_finalf_BranchlevelNum$ArchiValue
+
+# mean value by trait by group
+MyArchiphenos_finalf_BranchlevelNum %>%
+  group_by(trialType) %>%
+  get_summary_stats(ArchiValue, type = "mean_sd")
+# Anova to test the difference mean value
+res.aov <- aov(ArchiValue ~ trialType, data = MyArchiphenos_finalf_BranchlevelNum)
+summary(res.aov)
+TukeyHSD(res.aov)
+capture.output(TukeyHSD(res.aov), file="Result/MyArchiphenos_finalf_AOV.txt", append= TRUE)
+
+# For "PlantArchitecture" distribution
+#MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
+#MyArchiphenos_final_AR <- MyArchiphenos_final %>% filter(ArchiTRait == "PlantArchitecture")
+#str_replace_all(MyArchiphenos_final_AR$ArchiValue, c("1"="Non-Erect", "2"= "Erect"))
+#MyArchiphenos_final_AR$trialType <- factor(MyArchiphenos_final_AR$trialType, 
+#                                      levels = c("CET", "PYT", "AYT", "UYT"))
+#ggplot(data=MyArchiphenos_final_AR, aes(x=ArchiValue, fill = trialType)) +
+ # xlab("Plant_shape") + 
+ # geom_bar(width=0.5) + theme_bw() 
+##QQplot vizualization by trait
+#MyArchiphenos_final <- MyArchiphenos_final %>% filter(!is.na(StResiduals))
+#MyArchiphenos_finalT <- MyArchiphenos_final %>% filter(ArchiTRait == "PlantArchitecture")
+#ggplot(MyArchiphenos_finalT, aes(sample = StResiduals, col = trialType)) +
+#  geom_qq() + 
+#  ylab("StResiduals") +
+# xlab("norm quantile") +
+#  ggtitle("PlantArchitecture_qqplot/trialType") + 
+#  guides(fill=guide_legend(title="trialType")) +
+#  geom_qq_line() + 
+#  facet_wrap(~trialType) +
+#  theme_minimal() +
+#  scale_color_brewer(palette= "Dark2")
+#Residuals Distribution by trait
+results <- read_csv("Result/MixedModel_replicated.csv", col_names = TRUE)
+results_nonrep <- read_csv("Result/MixedModel_nonreplicated.csv", col_names = TRUE)
+Allresults <- bind_rows(results, results_nonrep) %>% dplyr::select(Trial, Trait, VarE) %>% rename(ArchiTRait = Trait)
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE)
+MyArchiphenos_final <- MyArchiphenos_final %>% group_by(trialType, studyName, ArchiTRait) %>% summarise(studyName = unique(studyName)) %>% rename(Trial = studyName)
+My_residuals <- left_join(MyArchiphenos_final, Allresults) 
+My_residuals <- My_residuals %>% filter(ArchiTRait %in% c("PlantHeight", "FirstBranchHeight", "BranchlevelNum"))#"PlantArchitecture"
+
+My_residuals$trialType <- factor(My_residuals$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT")) 
+My_residuals$Trait <- factor(My_residuals$ArchiTRait,      
+                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum"))# "PlantArchitecture"
+ggplot(data = My_residuals,
+                             aes(x=trialType,y=VarE, fill = ArchiTRait)) +
+  geom_boxplot(stat = "boxplot") +
+  stat_summary(fun=mean, na.rm = TRUE) +
+  labs(x= "Tria type", y= "Residuals value") + theme_bw() +
+    facet_grid(Trait~trialType, scales = "free")
+```
+
+```{r}
+#Check the correlation between trait with the original data
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
+MyArchiphenos_final$trialType <- factor(MyArchiphenos_final$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT"))
+MyArchiphenos_final_cor <- MyArchiphenos_final %>% #filter(ArchiTRait == "PlantArchitecture")
+  dplyr::group_by(trialType, ArchiTRait, germplasmName) %>%
+  summarise(Value = mean(ArchiValue, na.rm = T)) 
+MyArchiphenos_final_cor <- MyArchiphenos_final_cor %>% spread(ArchiTRait, Value) #%>% na.omit()
+#Cor by trial type
+MyArchiphenos_cor1 <- MyArchiphenos_final_cor %>%
+  filter(trialType == "CET") %>% ungroup() %>% dplyr::select (BranchlevelNum, FirstBranchHeight, PlantHeight,  DMC, FRWT, FTWT) %>% na.omit()#PlantArchitecture,, MCMDS
+MyArchiphenos_cor1 <- cor(MyArchiphenos_cor1)
+corrplot::corrplot(MyArchiphenos_cor1, method = "number", type = "upper", sig.level = 0.01, insig = "blank")
+mtext("CET", at=6, line=1, cex=2)
+```
+##Fit models to get the BLUP by trait for all the trials# Yield component have been added for testing the correlation with teh architecture traits.
+```{r}
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE)
+ArchiTRaits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "DMC", "FRWT","FTWT")#"PlantArchitecture","MCMDS"
+ArchiTRials <- MyArchiphenos_final %>% dplyr::select(studyName) %>% table %>% .[order(.)] %>% names
+i <- ArchiTRaits[1]
+j <- ArchiTRials[1]
+results <- tibble()
+for(i in ArchiTRaits){
+     data1 <- MyArchiphenos_final %>% 
+       filter(ArchiTRait == i)
+     Data <- tibble()
+  for(j in ArchiTRials){ 
+     data2 <- data1 %>% 
+       filter(studyName == j)
+     if(nrow(data2) > 1){
+       try(data2 <- data2 %>% mutate(PlantsPerPlot = ifelse(!all(is.na(PHar)), max(PHar, na.rm=T), NA),
+              PropPHar = PHar / PlantsPerPlot,
+              ArchiValue = ifelse(!is.na(PlantsPerPlot) & ArchiTRait %in% c("FRWT","FTWT"), yes = (ArchiValue / (PlantsPerPlot*PlotArea))*10,
+                                  no = ifelse(is.na(PlantsPerPlot) & ArchiTRait %in% c("FRWT","FTWT"), yes = NA, no = ArchiValue)),
+              PropPHar  = PropPHar) %>% 
+          filter(!is.na(ArchiValue)))
+      try(Data <- bind_rows(Data, data2)) 
+      }
+   }
+    Formula1 <- "ArchiValue ~ yearInLoc + (1|repInTrial) + (1|germplasmName)"#(1|blockInrep)
+Formula <- ifelse(unique(Data$ArchiTRait) %in% c("FRWT", "FTWT") & length(unique(Data$PropPHar)) > 1, yes = paste0(Formula1," + PropPHar"), Formula1)
+     try(MixedModels <- lmer(as.formula(Formula), data = Data)) #Error: vector memory exhausted (limit reached?) for germplasmName:yearInLoc/repIN in trial why we do not add GXE. 
+       meanNreps <- Data  %>%
+      count(germplasmName) %$% mean(n)
+       varcomps <- as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% spread(grp,vcov)
+       VarG <- as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[1,2]
+       #Vblock <- as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[2,2]
+       Vrep <- as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[2,2]
+       VarResidual <- as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[3,2]
+       H2 <- round(VarG/(VarG + ((Vrep + VarResidual)/meanNreps)),2)
+       BLUP <- ranef(MixedModels, condVar=TRUE)[["germplasmName"]]
+      PEV <- c(attr(BLUP, "postVar"))
+     try(blup<-tibble(GermplasmName=rownames(BLUP),BLUP=BLUP$`(Intercept)`,PEV=PEV) %>%
+        mutate(REL=1-(PEV/VarG),
+               drgBLUP=BLUP/REL,
+               WT=(1-H2)/((0.1 + (1-REL)/REL)*H2)))
+      try(out <- tibble(Trait = i,
+                        H2 = H2,
+                        VarComps = list(varcomps),
+                        BLUPs = list(blup),
+                        Model = Formula))
+try(results <- bind_rows(results, out))
+   rm(MixedModels); rm(out)
+ }
+
+saveRDS(results, file=here::here("Result","GeneralMML_result.rds"))
+# COMPUTE SELIND FROM BLUPs for Genselect
+blups_Archi <- results %>%
+    dplyr::select(Trait,BLUPs) %>%
+    filter(!Trait %in% c("DMC", "FRWT", "FTWT"))#"MCMDS"
+saveRDS(blups_Archi, file=here::here("output","blups_Archi.rds"))
+# COMPUTE SELIND FROM BLUPs
+ArchitMML_blups <- results %>%
+    dplyr::select(Trait,BLUPs) %>%
+    unnest(BLUPs) %>%
+    dplyr::select(GermplasmName,Trait,BLUP) %>%
+    spread(Trait,BLUP) ##spread() lays out each key-value pair across multiple columns.
+saveRDS(ArchitMML_blups, file=here::here("output","ArchitMML_blups.rds"))
+write.table(ArchitMML_blups, file = "Result/ArchitMML_blups", quote = F,
+            sep = ",", row.names = F)
+#Correlation between trait using the BLUPs VALUE
+
+BLUP <- ArchitMML_blups %>% dplyr::select(-GermplasmName) %>% dplyr::select(BranchlevelNum, FirstBranchHeight, PlantHeight, DMC, FRWT, FTWT) %>% na.omit()#PlantArchitecture, MCMDS,
+BLUP_cor <- cor(BLUP)
+Figplot2 <- corrplot::corrplot(BLUP_cor, method = "number", type = "upper", sig.level = 0.01, insig = "blank")
+mtext("BLUP", at=6.5, line=1, cex=2)
+```
+
+## If necessary Fit models to get the BLUP by trait/breeding stage for all the trials# Yield component have been added for testing the correlation with teh architecture traits.
+```{r}
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE)
+ArchiTRaits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "DMC", "FRWT","FTWT")#"PlantArchitecture","MCMDS"
+ArchiTRials <- MyArchiphenos_final %>% dplyr::select(studyName) %>% table %>% .[order(.)] %>% names
+ArchiTRialTyp <- MyArchiphenos_final %>% dplyr::select(trialType) %>% table %>% .[order(.)] %>% names
+i <- ArchiTRaits[1]
+j <- ArchiTRials[1]
+k <- ArchiTRialTyp[1]
+results <- tibble()
+for(i in ArchiTRaits){
+ for(k in ArchiTRialTyp){
+     data1 <- MyArchiphenos_final %>% 
+       filter(trialType == k, ArchiTRait == i)
+     Data <- tibble()
+  for(j in ArchiTRials){ 
+     data2 <- data1 %>% 
+       filter(studyName == j)
+     if(nrow(data2) > 1){
+       try(data2 <- data2 %>% mutate(PlantsPerPlot = ifelse(!all(is.na(PHar)), max(PHar, na.rm=T), NA),
+              PropPHar = PHar / PlantsPerPlot,
+              ArchiValue = ifelse(!is.na(PlantsPerPlot) & ArchiTRait %in% c("FRWT","FTWT"), yes = (ArchiValue / (PlantsPerPlot*PlotArea))*10,
+                                  no = ifelse(is.na(PlantsPerPlot) & ArchiTRait %in% c("FRWT","FTWT"), yes = NA, no = ArchiValue)),
+              PropPHar  = PropPHar) %>% 
+          filter(!is.na(ArchiValue)))
+      try(Data <- bind_rows(Data, data2)) 
+      }
+   }
+    Formula1 <- "ArchiValue ~ yearInLoc + (1|repInTrial) + (1|germplasmName)"#(1|blockInrep)
+Formula <- ifelse(unique(Data$ArchiTRait) %in% c("FRWT", "FTWT") & length(unique(Data$PropPHar)) > 1, yes = paste0(Formula1," + PropPHar"), Formula1)
+     try(MixedModels <- lmer(as.formula(Formula), data = Data)) #Error: vector memory exhausted (limit reached?) for germplasmName:yearInLoc/repIN in trial why we do not add GXE. 
+       meanNreps <- Data  %>%
+      count(germplasmName) %$% mean(n)
+       varcomps <- as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% spread(grp,vcov)
+       VarG <- as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[1,2]
+       #Vblock <- as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[2,2]
+       Vrep <- as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[2,2]
+       VarResidual <- as.data.frame(VarCorr(MixedModels))[,c("grp","vcov")] %>% .[3,2]
+       H2 <- round(VarG/(VarG + ((Vrep + VarResidual)/meanNreps)),2)
+       BLUP <- ranef(MixedModels, condVar=TRUE)[["germplasmName"]]
+      PEV <- c(attr(BLUP, "postVar"))
+     try(blup<-tibble(GermplasmName=rownames(BLUP),BLUP=BLUP$`(Intercept)`,PEV=PEV) %>%
+        mutate(REL=1-(PEV/VarG),
+               drgBLUP=BLUP/REL,
+               WT=(1-H2)/((0.1 + (1-REL)/REL)*H2)))
+      try(out <- tibble(Trait = i,
+                        trialType = k,
+                        H2 = H2,
+                        VarComps = list(varcomps),
+                        BLUPs = list(blup),
+                        Model = Formula))
+try(results <- bind_rows(results, out))
+   rm(MixedModels); rm(out)
+ }
+}
+saveRDS(results, file=here::here("Result","trialTyMML_result.rds"))
+H2trial1 <- results %>% select(Trait, trialType, H2)
+
+# COMPUTE SELIND FROM BLUPs for Genselect
+blups_Archi <- results %>%
+    dplyr::select(Trait,BLUPs) %>%
+    filter(!Trait %in% c("DMC", "FRWT", "FTWT", "MCMDS"))
+saveRDS(blups_Archi, file=here::here("output","blups_Archi.rds"))
+# COMPUTE SELIND FROM BLUPs
+ArchitMML_blups <- results %>%
+    dplyr::select(Trait,BLUPs) %>%
+    unnest(BLUPs) %>%
+    dplyr::select(GermplasmName,Trait,BLUP) %>%
+    spread(Trait,BLUP) ##spread() lays out each key-value pair across multiple columns.
+saveRDS(ArchitMML_blups, file=here::here("output","ArchitMML_blups.rds"))
+write.table(ArchitMML_blups, file = "Result/ArchitMML_blups", quote = F,
+            sep = ",", row.names = F)
+#Correlation between trait using the BLUPs VALUE
+
+BLUP <- ArchitMML_blups %>% dplyr::select(-GermplasmName) %>% dplyr::select(BranchlevelNum, FirstBranchHeight, PlantHeight, DMC, FRWT, FTWT) %>% na.omit()#PlantArchitecture, MCMDS,
+BLUP_cor <- cor(BLUP)
+Figplot2 <- corrplot::corrplot(BLUP_cor, method = "number", type = "upper", sig.level = 0.01, insig = "blank")
+mtext("BLUP", at=6.5, line=1, cex=2)
+```
+
+# For Shape trait
+```{r}
+Shapephenos_filtered <- read_csv("data/Shapephenos_filtered.csv", col_names = TRUE)
+Shapephenos_filtered <- Shapephenos_filtered %>% filter(!ShapeTRait == "Erectibility")
+Shapephenos_filtered$ShapeTRait <- 
+  fct_recode(Shapephenos_filtered$ShapeTRait, 
+             "Cylindrical" = "Cylindrical_type", 
+             "Open" = "Open_type",
+             "Compact" = "Compact_type", 
+             "Umbrella" = "Umbrella_type")
+
+ShapeTRaits <- c("Cylindrical", "Umbrella", "Open", "Compact") #"Erectibility"
+
+#recoding the shape trait to facilitate the correlation interpretation 
+Shapephenos_filtered$ShapeValue = ifelse(Shapephenos_filtered$ShapeValue %in% str_subset(Shapephenos_filtered$ShapeValue, "Non"), 0, 1)
+i <- ShapeTRaits [1]
+results_Shape<- tibble()
+for(i in ShapeTRaits){
+     Data <- Shapephenos_filtered %>% 
+       filter(ShapeTRait == i) %>%
+       
+     filter(!is.na(germplasmName))
+     if(nrow(Data) > 1){
+      if(length(unique(Data$ShapeValue)) > 1){ 
+     try(MixedModels_Shape <- lme4::glmer(ShapeValue ~ yearInLoc + (1|repInTrial) + (1|germplasmName), data = Data,  family = binomial, nAGQ = 0))#nAGQ Values greater produce greater accuracy but produce error message in my case.#(1|blockInrep) effect is almost 0
+                     meanNreps <- Data  %>%
+      count(germplasmName) %$% mean(n)
+       varcomps <- as.data.frame(VarCorr(MixedModels_Shape))[,c("grp","vcov")] %>% spread(grp,vcov)
+       varcomps$Residual <- as.data.frame(var(residuals(MixedModels_Shape))) %>% .[1,1] 
+       VarG <- as.data.frame(VarCorr(MixedModels_Shape))[,c("grp","vcov")] %>% .[1,2]
+       Vrep <- as.data.frame(VarCorr(MixedModels_Shape))[,c("grp","vcov")] %>% .[2,2]
+       VarResidual <- as.data.frame(var(residuals(MixedModels_Shape))) %>% .[1,1]
+       H2 <- round(VarG/(VarG + ((Vrep + VarResidual)/meanNreps)),2)
+       BLUP <- ranef(MixedModels_Shape, condVar=TRUE)[["germplasmName"]]
+      PEV <- c(attr(BLUP, "postVar"))
+     try(blup<-tibble(GermplasmName=rownames(BLUP),BLUP=BLUP$`(Intercept)`,PEV=PEV) %>%
+        mutate(REL=1-(PEV/VarG),
+               drgBLUP=BLUP/REL,
+               WT=(1-H2)/((0.1 + (1-REL)/REL)*H2)))
+      try(out <- tibble(Trait = i,
+                        H2 = H2,
+                        VarComps = list(varcomps),
+                        BLUPs = list(blup)))
+try(results_Shape <- bind_rows(results_Shape, out))
+   #rm(MixedModels_Shape); rm(out)
+      }
+  }   
+}
+
+saveRDS(results_Shape, file=here::here("Result","results_Shape.rds"))
+# COMPUTE SELIND FROM BLUPs for Genselect
+blups_Shape <- results_Shape %>%
+    dplyr::select(Trait,BLUPs)
+saveRDS(blups_Shape, file=here::here("output","blups_shape.rds"))
+# COMPUTE SELIND FROM BLUPs
+ShapeMML_blups <- results_Shape %>%
+    dplyr::select(Trait,BLUPs) %>%
+    unnest(BLUPs) %>%
+    dplyr::select(GermplasmName,Trait,BLUP) %>%
+    spread(Trait,BLUP) ##spread() lays out each key-value pair across multiple columns.
+saveRDS(ShapeMML_blups, file=here::here("output","ShapeMML_blups.rds"))
+write.table(ShapeMML_blups, file = "Result/ShapeMML_blups", quote = F,
+            sep = ",", row.names = F)
+#Correlation between trait using the BLUPs VALUE
+ArchitMML_blups <- readRDS("output/ArchitMML_blups.rds")
+ShapeMML_blups <- readRDS("output/ShapeMML_blups.rds")
+ShapeArchiMML_blups <- left_join(ShapeMML_blups, ArchitMML_blups)
+ShapeMML_blups <- ShapeArchiMML_blups %>% dplyr::select(-GermplasmName) %>% dplyr::select(BranchlevelNum, FirstBranchHeight, PlantHeight, Cylindrical, Umbrella, Open, Compact)  %>% na.omit() #, MCMDS, DMC, FRWT, FTWT,PlantArchitecture,Erectibility)
+ShapeMML_blups_cor <- cor(ShapeMML_blups)
+Figplot2 <- corrplot::corrplot(ShapeMML_blups_cor, method = "number", type = "upper", sig.level = 0.01, insig = "blank")
+mtext("BLUP", at=8.5, line=2.5, cex=2)
+```
+#Merge both two groups of blups to mame one file for genomic selection
+```{r}
+blups_Archi <- readRDS("output/blups_Archi.rds")
+blups <- bind_rows(blups_Archi,blups_Shape)
+saveRDS(blups, file=here::here("output","blups.rds"))
+### For global correlation 
+results <- readRDS("Result/GeneralMML_result.rds")
+results_Shape <- readRDS("Result/results_Shape.rds")
+General_results <- bind_rows(results,results_Shape)
+# COMPUTE SELIND FROM BLUPs
+MML_drgblups <- General_results %>%
+    dplyr::select(Trait,BLUPs) %>%
+    unnest(BLUPs) %>%
+    dplyr::select(GermplasmName,Trait,drgBLUP) %>%
+    spread(Trait,drgBLUP)
+#Correlation between trait using the drgBLUPs VALUE
+drgBLUP <- MML_drgblups %>% # dplyr::select(-GermplasmName) %>%
+  dplyr::select(BranchlevelNum, FirstBranchHeight, PlantHeight, Cylindrical, Umbrella, Open, Compact, DMC, FRWT, FTWT) #%>% na.omit()
+drgBLUP_cor <- cor(drgBLUP, use='pairwise')
+Figplot2 <- corrplot::corrplot(drgBLUP_cor, method = "number", sig.level = 0.001, type = "upper", insig = "blank")
+mtext("drgBLUP", at=6.5, line=1, cex=1.5) 
+```
+#Variance component
+```{r}
+results <- readRDS("Result/GeneralMML_result.rds")
+results_Shape <- readRDS("Result/results_Shape.rds")
+General_results <- bind_rows(results,results_Shape)
+Vartable <- General_results %>% 
+  dplyr::select(Trait, H2, VarComps) %>%
+  unnest(VarComps) %>%
+  dplyr::select(Trait, H2, germplasmName, Residual) %>%
+  mutate(Vg = round(germplasmName, digits = 2), 
+         Ve = round(Residual, digits = 2)) %>% 
+  dplyr::select(Trait, H2, Vg, Ve) 
+write_csv(Vartable, "Result/Vartable.csv", append = FALSE)
+```
+

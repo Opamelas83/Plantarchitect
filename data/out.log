@@ -1,0 +1,10 @@
+
+VCFtools - 0.1.16
+(C) Adam Auton and Anthony Marcketta 2009
+
+Parameters as interpreted:
+	--vcf VCF/BreedBaseGenotypesDownload_a.vcf
+
+After filtering, kept 1165 out of 1165 Individuals
+After filtering, kept 61239 out of a possible 61239 Sites
+Run Time = 5.00 seconds

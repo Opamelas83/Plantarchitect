@@ -1,0 +1,165 @@
+---
+title: "Archi_scale"
+author: "Opamelas83"
+date: "2023-05-04"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+# Distribution of plabt shape
+```{r}
+library(tidyverse); library(data.table); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm); library(lemon); library(reactablefmtr); library(corrplot);library(gridExtra); library(grid); library(gridtext) 
+MyArchiphenos <- read_csv("data/MyArchiphenotypes.csv", col_names = TRUE)
+ShapeTRaits <- c("Cylindrical_type", "Umbrella_type", "Open_type", "Compact_type")
+Shapephenos <- MyArchiphenos %>% 
+     # Convert the data to "long format" 
+     pivot_longer(cols = all_of(ShapeTRaits), 
+                  names_to = "ShapeTRait", values_to = "ShapeValue") %>%
+     # Remove missing values 
+     filter(!is.na(ShapeValue)) %>% 
+   filter(!is.na(replicate)) %>% 
+     filter(!is.na(germplasmName))
+
+Shapephenos_plant <- Shapephenos %>% dplyr::select(Year, trialType, ShapeTRait, ShapeValue) %>% filter (!is.na(ShapeValue)) %>% mutate(`Plant type` = ShapeValue)
+#ShapeTRait", values_to = "ShapeValue"
+Shapephenos_plantsum <- Shapephenos_plant %>% filter(!(`Plant type`) %in% c("Non_Cylindrical", "Non_Umbrella", "Non_Open","Non_Compact")) %>% group_by(trialType, `Plant type`) %>% summarise(numb = length(`Plant type`)) %>% mutate(`Value (%)` = round((numb/rowsum(numb, trialType)) * 100)) #"Non_Erect"
+
+Shapephenos_plantsum$trialType <- factor(Shapephenos_plantsum$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT"))
+Shapephenos_plantsum$`Plant type` <- factor(Shapephenos_plantsum$`Plant type`,      
+                        levels = c("Compact", "Open", "Umbrella", "Cylindrical"))
+#jpeg(filename = "Result/PlantShapedistri.jpeg")
+ggplot(data = Shapephenos_plantsum, aes(x = trialType, y = `Value (%)`, 
+                                group = `Plant type`)) +
+  geom_point(aes(color = `Plant type`), size = 3) +
+  geom_line(aes(color=`Plant type`), linetype = 81) +
+  scale_color_brewer(palette = "Dark2") +
+ ggtitle("Plant shape") +
+  xlab("breeding stage") #+
+ggsave("Result/PlantShapedistri.png",  scale = 1,)
+#theme(axis.title.x=element_blank())
+#dev.off()
+```
+### Field trials analysis: Run the model for Plantshape replicated trials
+```{r}
+ShapeTRials <- Shapephenos %>% dplyr::select(studyName) %>% table %>% .[order(.)] %>% names
+i <- ShapeTRaits [1]
+j <- ShapeTRials[1]
+results_Shape<- tibble()
+for(i in ShapeTRaits){
+ for(j in ShapeTRials){
+     Data <- Shapephenos %>% 
+       filter(studyName == j, ShapeTRait == i) %>% 
+     filter(!is.na(germplasmName))
+     if(nrow(Data) > 1){
+      if(length(unique(Data$ShapeValue)) > 1){ 
+     try(MixedModels_Shape <- glmer(as.factor(ShapeValue) ~ 1 + (1|germplasmName), data = Data,  family = binomial, nAGQ = 2))#repInTrial +
+ meanNreps<- Data  %>%
+      count(germplasmName) %$% mean(n)
+ try(result <- tibble(Trait = i,
+                      Trial = j,
+                      VarG = as.data.frame(VarCorr(MixedModels_Shape))[,c("grp","vcov")] %>% .[1,2],
+                          VarE = as.data.frame(var(residuals(MixedModels_Shape))) %>% .[1,1],
+                      Mean = as.data.frame(fixef(MixedModels_Shape))[1,],
+                      H2 = round(VarG/(VarG + VarE/meanNreps),2),
+                      CV = sigma(MixedModels_Shape)/Mean,
+                      PEV = mean((se.ranef(MixedModels_Shape)$germplasmName[,1])^2),
+                      Ac = round((1-PEV/VarG)^(1/2),2)))
+     try(results_Shape <- bind_rows(results_Shape, result))
+     #rm(MixedModels_Shape); rm(result)
+      }
+  }   
+}
+}
+#results_Shape
+#var(residuals(MixedModels_Shape))
+#[1] 0.006056236
+#var(summary()$residuals)
+#[1] 0.003159229
+write.table(results_Shape, file = "Result/results_Shape.csv", quote = T, sep =",", append = FALSE, row.names = F)
+
+write.table(Shapephenos, file = "data/Shapephenos.csv", quote = T, sep =",", append = FALSE, row.names = F)
+```
+# I would not filter for shape traits because the heritability was mostly high. but it still improve the general heritability. "(trials Filter trials for identify trials with low heritability (H2 < 0.1) and/or low accuracy (Ac < 0.4) for all the traits)"
+```{r}
+#Filter with H2 and Ac
+results_Shape <- read_csv("Result/results_Shape.csv", col_names = TRUE)
+# Determine the limit values of H2 and Ac by trait 
+#results_Shape %>% summary()
+# Visualize the distribution 
+#plot(results_Shape$H2, results_Shape$Ac) # It is a challenge to chose the value of H2 and AC. Here the trials have high values of both.
+Trials_to_keep <- results_Shape %>% filter((!is.na(H2) & H2 > 0.1) | (!is.na(Ac) & Ac >= 0.4)) # I should remove the trials by trait since a given trial can be in the "remove position" for 1 trait but be in the "stay position" for another trait. 
+ShapeTRaits <- c("Cylindrical_type", "Umbrella_type", "Open_type", "Compact_type", "Erectibility")#
+
+Shapephenos_filtered <- tibble()
+for(i in ShapeTRaits){
+  subdata <- Trials_to_keep %>% filter(Trait == i) 
+  subdata <- subdata$Trial
+  Shapephenos_filt <- Shapephenos %>% filter(ShapeTRait == i) 
+  Shapephenos_filtered1 <- Shapephenos_filt %>% dplyr::filter(studyName %in% subdata)
+ Shapephenos_filtered <- bind_rows(Shapephenos_filtered, Shapephenos_filtered1)
+}
+write.table(Shapephenos_filtered, file = "data/Shapephenos_filtered.csv", quote = TRUE, sep =",", append = FALSE, row.names = F)
+```
+#For plant Architecture traits
+```{r}
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
+MyArchiphenos_plantArch <- MyArchiphenos_final %>% dplyr::select(programName, Year, trialType, ArchiTRait, ArchiValue) %>% filter(ArchiTRait == "PlantArchitecture") %>% mutate(`Plant type` = paste0("Type",ArchiValue))
+
+MyArchiphenos_plantArchit <- MyArchiphenos_plantArch %>% group_by(programName,  trialType, `Plant type`) %>% summarise(numb = length(`Plant type`)) %>% mutate(`Value (%)` = round((numb/rowsum(numb, trialType)) * 100)) 
+
+MyArchiphenos_plantArchitIITA <- MyArchiphenos_plantArchit %>% filter(programName == "IITA") %>% dplyr::select(-programName)
+MyArchiphenos_plantArchitIITA$trialType <- factor(MyArchiphenos_plantArchitIITA$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT"))
+CompFIG1 <- ggplot(data = MyArchiphenos_plantArchitIITA, aes(x = MyArchiphenos_plantArchitIITA$trialType, y = `Value (%)`, group = `Plant type`)) +
+  geom_point(aes(color = `Plant type`), size = 3) +
+  geom_line(aes(color=`Plant type`), linetype = 81) +
+  scale_color_brewer(palette = "Dark2") +
+ ggtitle("IITA plant Architect") +
+theme(axis.title.x=element_blank())
+MyArchiphenos_plantArchitNRCRI <- MyArchiphenos_plantArchit %>% filter(programName == "NRCRI") %>% dplyr::select(-programName)
+MyArchiphenos_plantArchitNRCRI$trialType <- factor(MyArchiphenos_plantArchitNRCRI$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT"))
+ CompFIG2 <- MyArchiphenos_plantArchitNRCRI %>% filter(programName == "NRCRI") %>% ggplot(aes(x = MyArchiphenos_plantArchitNRCRI$trialType, y = `Value (%)`, group = `Plant type`)) +
+  geom_point(aes(color = `Plant type`), size = 3) +
+  geom_line(aes(color=`Plant type`), linetype = 81) +
+  scale_color_brewer(palette = "Dark2") +
+ ggtitle("NRCRI plant Architect") +
+  xlab("breeding stage") 
+nt <- theme(legend.position='none')
+p = list(CompFIG1+nt, CompFIG2+nt) %>% map(~.x + labs(x=NULL, y=NULL))
+jpeg(filename = "Result/PlantARCH_dist.jpeg")
+grid_arrange_shared_legend(CompFIG1+nt, CompFIG2+nt, ncol = 1, nrow = 2, position = "right")
+dev.off()
+```
+
+```{r}
+#correlation for plant architerture variable
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
+MyArchiphenos_final0 <- MyArchiphenos_final %>% dplyr::select(studyName, programName, trialType, germplasmName, ArchiTRait, ArchiValue) 
+MyArchiphenos_final1 <- MyArchiphenos_final0 %>% filter(ArchiTRait == "PlantArchitecture") %>% rename(PlantArchitecture = ArchiValue) %>% dplyr::select(-ArchiTRait)
+MyArchiphenos_final2 <- MyArchiphenos_final0 %>% filter(ArchiTRait == "FRWT") %>% rename(FRWT = ArchiValue) %>% dplyr::select(-ArchiTRait)
+MyArchiphenos_final3 <- MyArchiphenos_final0 %>% filter(ArchiTRait == "DMC") %>% rename(DMC = ArchiValue) %>% dplyr::select(-ArchiTRait)
+MyArchiphenos_final4 <- MyArchiphenos_final0 %>% filter(ArchiTRait == "MCMDS") %>% rename(MCMDS = ArchiValue) %>% dplyr::select(-ArchiTRait)
+
+MyArchiphenos_final_AR <- merge(MyArchiphenos_final1, MyArchiphenos_final2) 
+#levels = c("CET", "PYT", "AYT", "UYT")) 
+
+MyArchiphenos_final_ARx <-  MyArchiphenos_final_AR %>% mutate(PlantArchitecture =  as.factor(PlantArchitecture)) %>% rename(`Plant architecture score` = PlantArchitecture) %>% filter(trialType == "CET")
+CompFIG1 <- ggplot(MyArchiphenos_final_ARx, aes(x=`Plant architecture score`, y=FRWT, fill = `Plant architecture score`)) + 
+ geom_point(aes(color = `Plant architecture score`)) + 
+  scale_color_brewer(palette = "Dark2") +
+ ggtitle("AYT") +
+ theme(axis.title=element_blank()) 
+  #ylab("Fresh root weight") +
+  #xlab("Plant architecture") 
+nt <- theme(legend.position='none')
+#p = list(CompFIG1+nt, CompFIG2+nt, CompFIG3+nt, CompFIG4+nt) %>% map(~.x + labs(x=NULL, y=NULL))
+jpeg(filename = "Result/PlantARCH_corr.jpeg")
+Figure <- ggarrange(CompFIG1, CompFIG2, CompFIG3, CompFIG4, ncol = 2, nrow = 2, common.legend = TRUE, legend = "right")#common.legend = TRUE, legend = "bottom"
+#library ggpubr
+annotate_figure(Figure, left = textGrob("Fresh root weight", rot = 90, vjust = 1, gp = gpar(cex = 1.3)), bottom = textGrob("Plant architecture", gp = gpar(cex = 1.3)))
+dev.off()
+```
+

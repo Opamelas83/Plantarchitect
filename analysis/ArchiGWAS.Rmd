@@ -1,0 +1,460 @@
+---
+title: "ArchiGWAS"
+author: "Opamelas83"
+date: "2023-05-24"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## Introduction
+```{r}
+install.packages("sommer") #new version is important
+library(tidyverse); library(data.table); library(genomicMateSelectR); library(magrittr); library(sommer); library(corrplot); library(qqman)
+#library(snpsOfInterest)
+#str(snpsOfInterest) It is possible to color the important SNP= SNP of unterest.
+```
+#Filter the blups to keep phenotype with genotypes data.
+```{r}
+#For GWAS, keep only genotyped and phenotyped. remove non-phenotyped from kinship
+##### create the variance-covariance matrix
+dosages<-readRDS(file=here::here("data","dosages.rds"))
+Dosage_pca <- read_csv("output/Dosage_pca.csv")
+Dosage_pca <- Dosage_pca %>% 
+  mutate(pca1 = Dim.1 , pca2 = Dim.2, Locus = marker, Chrom = chromosome, Chrom = as.numeric(Chrom)) %>% dplyr::select(Locus, Chrom, pca1, pca2)
+#dosagemarker <- left_join(dosagemarker, Dosage_pca)
+A<-readRDS(file=here::here("output","kinship_add.rds"))# additive relationship matrix
+blups<-readRDS(here::here("output","blups.rds"))
+blup1 <- blups[[2]][[1]] %>% 
+     # need also to remove phenotyped-but-not-genotyped lines
+     filter(GermplasmName %in% rownames(A)) %>% 
+                                  # rename the germplasmName column to GID
+                                  rename(GID=GermplasmName)
+# get the PCA
+pca_ind_dim12 <- read_csv("Result/pca_ind_dim12.csv")
+pca_ind_dim12M <- pca_ind_dim12 %>% mutate(GID = germplasmName) %>% dplyr::select(GID, Dim.1, Dim.2)
+blup1 <- left_join(blup1, pca_ind_dim12M)
+#remove non-phenotyped from A kinship
+gids<- unique(blup1$GID)
+A1 <- A[gids,gids]
+#Mydosages_frame <- column_to_rownames(as.data.frame(Mydosages), var = "germplasmName")
+dosages1 <- dosages[gids,]
+#dim(A1)
+#A1[1:3,1:3]
+#Tried to recode my dosage matrix, but it is not necessary.
+#dosages1[dosages1==0] <- (-1)
+#dosages1[dosages1==1] <- 0
+#dosages1[dosages1==2] <- 1
+```
+
+```{r}
+Mydosages <- as_tibble(dosages, rownames = NA)
+Mydosages <- rownames_to_column(Mydosages) %>% rename(germplasmName = rowname)
+Mydosages_frame <- column_to_rownames(as.data.frame(Mydosages), var = "germplasmName")
+dosagecolnamelist <- colnames(Mydosages_frame)
+dosagecolname <- as.data.frame(dosagecolnamelist) %>% slice(-1) %>% rename(Locus = dosagecolnamelist)
+#dosagecolname <- as_tibble(dosagecolname)
+dosagemarker <- dosagecolname %>% separate(Locus, c("Chrom", "Position", "v1", "v2"), sep = "_", remove = FALSE) %>% dplyr::select(-v1, -v2) %>% mutate(Position = as.numeric(Position), Chrom = as.numeric(Chrom)) %>% mutate(Position = round(Position/100000, digits=1))
+
+```
+#Fit GWAS from sommer package
+```{r}
+mix1 <- sommer::GWAS(BLUP~Dim.1,# it improved the Qqplot?
+random=~vsr(GID,Gu=A1),#Dim.2
+rcov=~vsr(units),
+data=blup1, nIters=15,
+M=dosages1, gTerm = "u:GID",
+verbose = FALSE,
+P3D = FALSE)
+saveRDS(mix1, (here::here("output","GWAS_BranchlevelNumNEW.rds")))
+#saveRDS(mix1, (here::here("output","GWAS_FirstBranchHeight.rds")))
+#saveRDS(mix1, (here::here("output","GWAS_PlantHeight.rds")))
+#GWAS_BranchlevelNum.rds; GWAS_FirstBranchHeight.rds,"GWAS_PlantHeight.rd 
+```
+
+```{r}
+mix1 <- readRDS(here::here("output","GWAS_BranchlevelNum.rds"))
+ms <- as.data.frame(mix1$scores)
+ms$Locus <- rownames(ms)
+ms <- cbind(ms, ms_pval)
+MP2 <- merge(dosagemarker,ms,by="Locus",all.x = TRUE)
+MP2 <- MP2 %>% mutate(Chrom = as.numeric(Chrom),
+                      Position = as.numeric(Position),
+                      BLUP = ifelse(is.infinite(BLUP), 0, BLUP),
+                      `p.val` = (BLUP)) %>% rename(Reelpvalue = V1)
+write_csv(MP2, "Result/MP2_GWAS_BranchlevelNum.csv", append = FALSE)
+#MP2_GWAS_BranchlevelNum <- read_csv("Result/MP2_GWAS_BranchlevelNum.csv")
+#Determine number of QTLS BY trait by chrom
+#QTL_GWAS_PlantHeight <- MP2 %>% filter(MP2$BLUP > 5.35) =0
+#QTL_GWAS_FirstBranchHeight <- MP2 %>% filter(MP2$BLUP > 5.35) =0
+QTL_GWAS_BranchlevelNum <- MP2 %>% filter(MP2$BLUP > 5.35) %>% mutate(Reelpvalue = round(Reelpvalue, digit = 2))
+write_csv(QTL_GWAS_BranchlevelNum, "Result/QTL_GWAS_BranchlevelNum.csv", append = FALSE)
+plotTittle = (paste0("Manhattan Plot ",blups[[1]][[3]]))
+#sommer::manhattan(MP2, pch=20, cex=.5, col = c("orange3", "grey40"), main = plotTittle, fdr.level=0.01)#sommer manhattan different from qqman
+#MP2 <- MP2 %>% rename(BP = Position, CHR = Chrom, P = `p.val`) %>% dplyr::select(Locus, BP, CHR, P) %>% mutate(BP = as.numeric(BP), CHR = as.numeric(CHR), P = as.numeric(P))
+qqman::manhattan(MP2, chr = "Chrom", bp = "Position", p = "p.val", snp = "Locus", ylim = c(0,4),  logp = F, genomewideline = FALSE, cex = 0.6, cex.axis = 0.9, col = c("orange3", "grey40"), main = plotTittle)# FRD(0.05) = 4.35. 5.35 is the value got from automatically from sommer::manhanttan. logp = FALSE, because I'm using the scores values from sommer out put that I think is the -log(P.value). I get the same result.
+MS <- as.data.frame(mix1$pvals)
+MS$`P.val` <- MS$V1
+qq(MS$`P.val`)
+#save plot
+#Dm
+```
+
+```{r}
+#Packages folder
+ "/Library/Frameworks/R.framework/Versions/4.3-x86_64/Resources/library/GENESIS" 
+```
+
+```{r}
+#Test population structure: estimate genomic inflation factor
+#library(QQperm)
+MP2 <- MP2 %>% mutate(Chrom = as.numeric(Chrom),
+                      Position = as.numeric(Position),
+                      BLUP = ifelse(is.infinite(BLUP), 0, BLUP),
+                      `p.val` = (BLUP))
+
+MP2 <- MP2 %>% filter(`p.val` > 0.0000)
+chisq <- qchisq(1-MP2$`p.val`,1,lower.tail = F)
+median(na.omit(chisq))/qchisq(0.5,1)
+#2.77934
+# 0.2436488
+```
+
+#GWAS with Bioconductor (GENESIS AND GWASTOOLS)
+```{r}
+library(GENESIS); library(GWASTools)
+#Read genotype data
+dosages<-readRDS(file=here::here("data","dosages.rds"))
+A<-readRDS(file=here::here("output","kinship_add.rds"))#
+Mydosages <- as_tibble(dosages, rownames = NA)
+Mydosages <- rownames_to_column(Mydosages) %>% rename(germplasmName = rowname)
+Mydosages_frame <- column_to_rownames(as.data.frame(Mydosages), var = "germplasmName")
+#read my phenotype data and keep pheno and geno
+Shapephenos_filteredFIN <- read_csv("data/Shapephenos_spread.csv")
+mydata <- data.frame(scanID = Shapephenos_filteredFIN$`Individual ID`, pheno = Shapephenos_filteredFIN$Compact_type)
+mydataF <- mydata %>% filter(scanID %in% Mydosages$germplasmName)
+pca_ind_dim12 <- read_csv("Result/pca_ind_dim12.csv")
+pca_ind_dim12M <- pca_ind_dim12 %>% mutate(scanID = germplasmName) %>% dplyr::select(scanID, Dim.1)
+mydataF <- left_join(mydataF, pca_ind_dim12M)
+#filter to keep geno and pheno
+gids <- unique(mydataF$scanID)
+Mydosages2 <- Mydosages_frame[gids, ]
+#Modify germplasm name in phenotype
+mydataF$scanID <- gsub(pattern = "[[:punct:]]", replacement = "", x = mydataF$scanID)
+mydataF$scanID <- gsub(pattern = " ", replacement = "", x = mydataF$scanID)
+mydataFF <- mydataF %>% mutate(germplasmName = scanID, scanID_num = row_number())
+ScanID_A <- mydataFF %>% dplyr::select(germplasmName, scanID_num) %>% rename(scanID = scanID_num)
+mydataFF <- mydataFF %>% mutate(SampleID = scanID_num, pc1 = Dim.1) %>% dplyr::select(-scanID, -germplasmName) %>% rename(scanID = scanID_num) %>% dplyr::select(SampleID, scanID, pc1, pheno) 
+mydataFF <- column_to_rownames(as.data.frame(mydataFF), var = "SampleID")
+#head(mydataFF)
+MyscanAnnot <- ScanAnnotationDataFrame(mydataFF)
+MyscanAnnot
+#Modify germplasm and SNP name in Genotype data and transpose to make the snp row name.
+Mydosages2S <- as_tibble(Mydosages2, rownames = NA)
+Mydosages2S <- rownames_to_column(Mydosages2S) %>% rename(germplasmName = rowname)
+Mydosages2S$germplasmName <- gsub(pattern = "[[:punct:]]", replacement = "", x = Mydosages2S$germplasmName)#Remove special character
+Mydosages2S$germplasmName <- gsub(pattern = " ", replacement = "", x = Mydosages2S$germplasmName)#Remove special character
+Mydosages2S <- Mydosages2S %>% mutate(scanID = germplasmName, scanID_num = row_number()) %>% dplyr::select(-scanID) %>% rename(scanID = scanID_num)
+ScanID_B <- Mydosages2S %>% dplyr::select(germplasmName, scanID)
+Mydosages2SS <- Mydosages2S %>% dplyr::select(-germplasmName)
+Mydosages2S_frame <- column_to_rownames(as.data.frame(Mydosages2SS), var = "scanID")
+#For the dosage matrix
+Mydosages2ST <- as.data.frame(t(Mydosages2S_frame))
+Mydosages2ST_ne <- rownames_to_column(Mydosages2ST) %>% rename(Locus = rowname)
+TransfMydosages1 <- Mydosages2ST_ne  %>% 
+  separate(Locus, c("chromosome", "position", "v1", "v2"), sep = "_", remove = FALSE) %>% 
+  #dplyr::select(-v1, -v2) %>% 
+  mutate(position = as.integer(position),
+         markerID = order(position),
+         snpID = paste0(chromosome,row_number()))
+#Save "TransfMydosages1" to retrieve locus ID 
+write_csv(TransfMydosages1, "Result/SNPLocusID.csv", append = FALSE)
+TransfMydosages2 <- TransfMydosages1 %>% dplyr::select(-v1, -v2, -position, -chromosome, -markerID, -Locus) 
+TransfMydosages <- column_to_rownames(as.data.frame(TransfMydosages2), var = "snpID")
+TransfMydosages <- as.matrix(TransfMydosages)
+#prepare marker information
+TransfMydosages1_markers <- TransfMydosages1  %>% 
+  mutate(snpID = as.integer(snpID),
+         position = as.integer(position),
+         chromosome = as.integer(chromosome))
+MySCAN_ID <- left_join(ScanID_A, ScanID_B)
+Mygeno <- MatrixGenotypeReader(genotype = TransfMydosages,
+                               snpID = TransfMydosages1_markers$snpID,
+                             chromosome = TransfMydosages1_markers$chromosome,
+                             position = TransfMydosages1_markers$position,
+                             scanID = MySCAN_ID$scanID)
+MygenoData <- GenotypeData(Mygeno)
+
+# read in GDS data
+gdsfile <- system.file("extdata", "HapMap_ASW_MXL_geno.gds", package="GENESIS")
+HapMap_geno <- GdsGenotypeReader(filename = gdsfile)
+# create a GenotypeData class object with paired ScanAnnotationDataFrame
+A<-readRDS(file=here::here("output","kinship_add.rds"))#
+MyA <- A[gids,gids]
+MyA <- as_tibble(MyA, rownames = NA)
+A1 <- rownames_to_column(MyA) %>% rename(germplasmName = rowname)
+A1$germplasmName <- gsub(pattern = "[[:punct:]]", replacement = "", x = A1$germplasmName)#Remove special character
+A1$germplasmName <- gsub(pattern = " ", replacement = "", x = A1$germplasmName)#Remove special character
+A2 <- A1 %>% mutate(scanID = germplasmName, scanID_num = row_number()) %>% dplyr::select(-scanID, -germplasmName) %>% rename(scanID = scanID_num)
+A2_frame <- column_to_rownames(as.data.frame(A2), var = "scanID")
+
+#For the relationship matrix: mypcrel contains Kinship Estimates from a previous PC-Relate analysis
+A3 <- as.data.frame(t(A2_frame))
+MyA3 <- as_tibble(A3, rownames = NA)
+MyA3 <- rownames_to_column(MyA3) %>% rename(germplasmName = rowname)
+MyA3$germplasmName <- gsub(pattern = "[[:punct:]]", replacement = "", x = MyA3$germplasmName)#Remove special character
+MyA3$germplasmName <- gsub(pattern = " ", replacement = "", x = MyA3$germplasmName)
+MyA3 <- MyA3 %>% mutate(scanID = germplasmName, scanID_num = row_number()) %>% dplyr::select(-scanID, -germplasmName) %>% rename(scanID = scanID_num)
+MyA3_frame <- column_to_rownames(as.data.frame(MyA3), var = "scanID")
+MyA4 <- as.matrix(MyA3_frame)# Here you are my Additive 
+#MyA4 [1:5,1:5]
+#dim(MyA4)
+#Fit the Null Model
+nullmod <- fitNullModel(MyscanAnnot, outcome = "pheno",
+                        cov.mat = MyA4, covars = "pc1", family = "binomial")
+#Run SNP-Phenotype Association Tests
+MygenoIterator <- GenotypeBlockIterator(MygenoData, snpBlock=6000)
+assoc <- assocTestSingle(MygenoIterator, null.model = nullmod)
+write_csv(assoc, "Result/GWAS_Compact_type.csv", append = FALSE)
+##attribute the right locus/SNP name
+TransfMydosages1 <- read_csv("data/SNPLocusID.csv")
+TransfMydosages1forjoin <- TransfMydosages1 %>%
+  rename(chr= chromosome, pos = position) %>%
+  mutate(chr = as.character(chr)) %>%
+  dplyr::select(Locus, chr, pos)
+MPT <- read_csv("Result/GWAS_Compact_type.csv")
+MPTtrans <- MPT %>% mutate(chr = as.character(chr))
+MPTLocus <- left_join(MPTtrans, TransfMydosages1forjoin)
+##Determine number of QTLS BY trait by chrom
+QTL_GWAS_Compact_type <- MPTLocus %>% filter(-log10(MPTLocus$`Score.pval`) > 5) QTL_GWAS_Compact_type <- QTL_GWAS_Compact_type %>% mutate(chr = as.numeric(chr)) %>% mutate(pos = round(pos/100000, digits=1))
+write_csv(QTL_GWAS_Compact_type, "Result/QTL_GWAS_Compact_type.csv", append = FALSE)
+#suggestiveline	Where to draw a "suggestive" line. Default -log10(1e-5). Set to FALSE to disable. #manhattanPlot(pvals, chromosome, signif=1e-5) detect automatically
+#QTL_GWAS_Open_type <- MPT %>% filter(MPT$`Score.pval` > 5) =0
+#QTL_GWAS_Cylindrical_type <- MPT %>% filter(MPT$`Score.pval` > 5) = 0
+#QTL_GWAS_Umbrella_type <- MPT %>% filter(MPT$`Score.pval` > 5) = 0
+
+#Heritability Estimation
+#It is often of interest to estimate the proportion of the total phenotype variability explained by the entire set of genotyped SNPs avaialable; this provides an estimate of the narrow sense heritability of the trait. One method for estimating heritability is to use the variance component estimates from the null mixed model. GENESIS includes the varCompCI function for computing the proportion of variance explained by each random effect along with 95% confidence intervals.
+
+#varCompCI(nullmod, prop = TRUE)
+```
+For Manahattan plot
+```{r}
+GWAS_Compact_type <- read_csv("Result/GWAS_Compact_type.csv")
+#GWAS_Compact_type1 <-left_join(GWAS_Compact_type,)
+#library(qqman); library(snpsOfInterest) str(snpsOfInterest) It is possible to color the important SNP= SNP of unterest.
+plotTittle = ("Manhattan plot Compact_type")
+qqman::manhattan(GWAS_Compact_type, chr = "chr", bp = "pos", p= "Score.pval", snp = "variant.id", ylim = c(0,8), logp = TRUE, genomewideline = FALSE, col = c("orange3", "grey40"), main = plotTittle, cex = 0.5, cex.axis = 0.8)#annotatePval = 0.001, annotateTop = FALSE,
+qq(GWAS_Compact_type$Score.pval)
+#GWAS_Compact_typeB <- GWAS_Compact_type %>% dplyr::select(chr, pos, Score) %>% rename(Chrom = chr, Position = pos, `p.val` = Score)
+#sommer::manhattan(GWAS_Compact_typeB, pch=20, cex=.5, col = c("orange3", "grey40"), main = plotTittle, fdr.level=0.001)#sommer manhattan different from qqman
+#Heritability Estimation
+varCompCI(nullmod, prop = TRUE)
+H= A-
+```
+
+
+```{r}
+#Transfodosages2 <- as_tibble(Transfodosages2)
+
+Mydosages_frame <- column_to_rownames(as.data.frame(Mydosages), var = "germplasmName")
+#Transfodosages2 <- rownames_to_column(dosages2) %>% 
+
+#Transfodosages2 <- rownames_to_column(Transfodosages2)
+#Transfodosages2 <- as_tibble(Transfodosages2)
+dosages2$germplasmName <- gsub(pattern = "-", replacement = "", x = dosages2$germplasmName)
+Transfodosages2 <- t(dosages2)
+#Transfodosages2 <- as_tibble(dosages2, rownames = NA)
+#Transfodosages2 <- rownames_to_column(Transfodosages2) %>% rename(Locus = rowname)
+#Find marker list 
+Transfodosages2_markerlist <- Transfodosages2$Locus
+Transfodosages2_marker<- as.data.frame(Transfodosages2_markerlist) %>% slice(-1) %>% rename(Locus = Transfodosages2_markerlist)
+Transfodosages2_markers <- Transfodosages2_marker %>% 
+  separate(Locus, c("chromosome", "position", "v1", "v2"), sep = "_", remove = FALSE) %>% 
+  dplyr::select(-v1, -v2) %>% 
+  mutate(position = as.integer(position),
+         markerID = order(position),
+         snpID = paste0(chromosome,row_number()))
+Transfodosages2_markers <- Transfodosages2_markers %>% 
+  mutate(snpID = as.integer(snpID),
+         chromosome = as.integer(chromosome))
+
+#make the dosage matrix conform to the the markers list file
+Transfodosages2_dos <- Transfodosages2 %>% separate(Locus, c("chromosome", "position", "v1", "v2"), sep = "_", remove = FALSE) %>% 
+  mutate(position = as.integer(position),
+         markerID = order(position),
+         snpID = paste0(chromosome,row_number()))
+Transfodosages2_dosage <- Transfodosages2_dos %>% dplyr::select(-v1, -v2, -position, -chromosome, -markerID, -Locus) 
+Transfodosages2_dosage <- column_to_rownames(as.data.frame(Transfodosages2_dosage), var = "snpID")
+Transfodosages2_dosage <- as.matrix(Transfodosages2_dosage)
+```
+
+plink training
+
+```{r}
+#My alternate phenotype file
+Shapephenos_filtered <- read_csv("data/Shapephenos_filtered.csv", col_names = TRUE)
+#ShapeTRaits <- c("Cylindrical_type", "Umbrella_type", "Open_type", "Compact_type", "Erectibility")
+#recoding the shape trait to facilitate the correlation interpretation 
+Shapephenos_filtered$ShapeValue = ifelse(Shapephenos_filtered$ShapeValue %in% str_subset(Shapephenos_filtered$ShapeValue, "Non"), 0, 1)
+Shapephenos_filtered <- Shapephenos_filtered %>% mutate()
+#Shapephenos_filtered <- Shapephenos_filtered  %>% 
+#  count(studyName, trialType, Location, observationLevel, replicate, blockNumber, entryType) %>%
+#  spread(entryType,n)
+Shapephenos_filtered0 <- Shapephenos_filtered %>% dplyr::select(studyName, programName, trialType, plotNumber, germplasmName, ShapeTRait, ShapeValue) %>% distinct()
+Shapephenos_filtered1 <- Shapephenos_filtered0 %>% filter(ShapeTRait == "Cylindrical_type") %>% rename(Cylindrical_type = ShapeValue) %>% dplyr::select(-ShapeTRait)
+Shapephenos_filtered2 <- Shapephenos_filtered0 %>% filter(ShapeTRait == "Umbrella_type") %>% rename(Umbrella_type = ShapeValue) %>% dplyr::select(-ShapeTRait)
+Shapephenos_filtered3 <- Shapephenos_filtered0 %>% filter(ShapeTRait == "Open_type") %>% rename(Open_type = ShapeValue) %>% dplyr::select(-ShapeTRait)
+Shapephenos_filtered4 <- Shapephenos_filtered0 %>% filter(ShapeTRait == "Compact_type") %>% rename(Compact_type = ShapeValue) %>% dplyr::select(-ShapeTRait)
+Shapephenos_filtered5 <- Shapephenos_filtered0 %>% filter(ShapeTRait == "Erectibility") %>% rename(Erectibility = ShapeValue) %>% dplyr::select(-ShapeTRait)
+Shapephenos_filtered12 <- left_join(Shapephenos_filtered1, Shapephenos_filtered2)
+Shapephenos_filtered34 <- left_join(Shapephenos_filtered3, Shapephenos_filtered4)
+Shapephenos_filtered345 <- left_join(Shapephenos_filtered34, Shapephenos_filtered5)
+Shapephenos_filteredFI <- left_join(Shapephenos_filtered12, Shapephenos_filtered345)
+Shapephenos_filteredFIN <- Shapephenos_filteredFI %>% dplyr::select(-studyName, -programName, -trialType, -plotNumber) %>%
+distinct(germplasmName, .keep_all = T) %>% mutate(`Individual ID` = germplasmName) %>% dplyr::select(-germplasmName) %>% dplyr::select(`Individual ID`, Cylindrical_type, Umbrella_type, Open_type, Compact_type, Erectibility)
+Shapephenos_filteredFIN[is.na(Shapephenos_filteredFIN)] <- 0 
+#write.table(Shapephenos_filteredFIN, "/Users/mo367/Desktop/Plantarchitect_PLINK/Shapephenos.txt", quote = F, row.names = F, col.names = T)
+write_csv(Shapephenos_filteredFIN, "data/Shapephenos_spread.csv", append = FALSE) 
+Shapephenos_filteredFIN <- read_csv("data/Shapephenos_spread.csv")
+Myindiv <- Shapephenos_filteredFIN$`Individual ID`
+write.table(Myindiv, file = "/Users/mo367/Desktop/Plantarchitect_PLINK/Myindiv.txt", sep = "\t",
+            row.names = FALSE, col.names = FALSE, quote = FALSE)
+#print(Myindiv, quote = F)
+ mutate(germplasmName = as.factor(germplasmName)) %>% group_by(Cylindrical_type, Umbrella_type, Open_type + Compact_type, Erectibility, germplasmName) %>% summarise(N = length(germplasmName)) #%>% filter(N == 1)
+
+
+Shapephenos_filteredFI <- Shapephenos_filteredFI %>% distinct() 
+#%>%
+mutate(n = (Cylindrical_type + Umbrella_type + Open_type + Compact_type)) %>% filter(n == !0)
+
+```
+
+```{r eval=FALSE, include=FALSE}
+#% plink
+#PLINK v1.90b7 64-bit (16 Jan 2023)             www.cog-genomics.org/plink/1.9/
+#(C) 2005-2023 Shaun Purcell, Christopher Chang   GNU General Public License v3#
+#  plink <input flag(s)...> [command flag(s)...] [other flag(s)...]
+#  plink --help [flag name(s)...]
+
+#Commands include --make-bed, --recode, --flip-scan, --merge-list,
+#--write-snplist, --list-duplicate-vars, --freqx, --missing, --test-mishap,
+#--hardy, --mendel, --ibc, --impute-sex, --indep-pairphase, --r2, --show-tags,
+#--blocks, --distance, --genome, --homozyg, --make-rel, --make-grm-gz,
+#--rel-cutoff, --cluster, --pca, --neighbour, --ibs-test, --regress-distance,
+#--model, --bd, --gxe, --logistic, --dosage, --lasso, --test-missing,
+#--make-perm-pheno, --tdt, --qfam, --annotate, --clump, --gene-report,
+#--meta-analysis, --epistasis, --fast-epistasis, and --score.
+
+#"plink --help | more" describes all functions (warning: long).
+#mo367@AG-PBG-92GML7L ~ % cd /Users/mo367/Desktop/Plantarchitect_PLINK 
+#mo367@AG-PBG-92GML7L Plantarchitect_PLINK % plink --file myplinkdata
+#PLINK v1.90b7 64-bit (16 Jan 2023)             www.cog-genomics.org/plink/1.9/
+#(C) 2005-2023 Shaun Purcell, Christopher Chang   GNU General Public License v3
+#Logging to plink.log.
+#Options in effect:
+  --file myplinkdata
+
+16384 MB RAM detected; reserving 8192 MB for main workspace.
+Error: Failed to open myplinkdata.map.
+mo367@AG-PBG-92GML7L Plantarchitect_PLINK % plink
+PLINK v1.90b7 64-bit (16 Jan 2023)             www.cog-genomics.org/plink/1.9/
+(C) 2005-2023 Shaun Purcell, Christopher Chang   GNU General Public License v3
+
+  plink <input flag(s)...> [command flag(s)...] [other flag(s)...]
+  plink --help [flag name(s)...]
+
+Commands include --make-bed, --recode, --flip-scan, --merge-list,
+--write-snplist, --list-duplicate-vars, --freqx, --missing, --test-mishap,
+--hardy, --mendel, --ibc, --impute-sex, --indep-pairphase, --r2, --show-tags,
+--blocks, --distance, --genome, --homozyg, --make-rel, --make-grm-gz,
+--rel-cutoff, --cluster, --pca, --neighbour, --ibs-test, --regress-distance,
+--model, --bd, --gxe, --logistic, --dosage, --lasso, --test-missing,
+--make-perm-pheno, --tdt, --qfam, --annotate, --clump, --gene-report,
+--meta-analysis, --epistasis, --fast-epistasis, and --score.
+
+"plink --help | more" describes all functions (warning: long).
+mo367@AG-PBG-92GML7L Plantarchitect_PLINK % plink --file myplinkdata
+PLINK v1.90b7 64-bit (16 Jan 2023)             www.cog-genomics.org/plink/1.9/
+(C) 2005-2023 Shaun Purcell, Christopher Chang   GNU General Public License v3
+Logging to plink.log.
+Options in effect:
+  --file myplinkdata
+
+16384 MB RAM detected; reserving 8192 MB for main workspace.
+Error: Failed to open myplinkdata.map.
+mo367@AG-PBG-92GML7L Plantarchitect_PLINK % plink --script myscript1.txt
+PLINK v1.90b7 64-bit (16 Jan 2023)             www.cog-genomics.org/plink/1.9/
+(C) 2005-2023 Shaun Purcell, Christopher Chang   GNU General Public License v3
+Error: Failed to open myscript1.txt.
+mo367@AG-PBG-92GML7L Plantarchitect_PLINK % plink --vcf BreedBaseGenotypes.vcf.gz --maf 0.05 --recode --out myplink 
+PLINK v1.90b7 64-bit (16 Jan 2023)             www.cog-genomics.org/plink/1.9/
+(C) 2005-2023 Shaun Purcell, Christopher Chang   GNU General Public License v3
+Logging to myplink.log.
+Options in effect:
+  --maf 0.05
+  --out myplink
+  --recode
+  --vcf BreedBaseGenotypes.vcf.gz
+
+16384 MB RAM detected; reserving 8192 MB for main workspace.
+Error: Multiple instances of '_' in sample ID.
+If you do not want '_' to be treated as a FID/IID delimiter, use --double-id or
+--const-fid to choose a different method of converting VCF sample IDs to PLINK
+IDs, or --id-delim to change the FID/IID delimiter.
+mo367@AG-PBG-92GML7L Plantarchitect_PLINK % plink --vcf BreedBaseGenotypes.vcf.gz --maf 0.05 --recode --double-id --out myplink
+PLINK v1.90b7 64-bit (16 Jan 2023)             www.cog-genomics.org/plink/1.9/
+(C) 2005-2023 Shaun Purcell, Christopher Chang   GNU General Public License v3
+Logging to myplink.log.
+Options in effect:
+  --double-id
+  --maf 0.05
+  --out myplink
+  --recode
+  --vcf BreedBaseGenotypes.vcf.gz
+
+16384 MB RAM detected; reserving 8192 MB for main workspace.
+--vcf: myplink-temporary.bed + myplink-temporary.bim + myplink-temporary.fam
+written.
+61239 variants loaded from .bim file.
+7417 people (0 males, 0 females, 7417 ambiguous) loaded from .fam.
+Ambiguous sex IDs written to myplink.nosex .
+Using 1 thread (no multithreaded calculations invoked).
+Before main variant filters, 7417 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+Total genotyping rate is exactly 1.
+5684 variants removed due to minor allele threshold(s)
+(--maf/--max-maf/--mac/--max-mac).
+55555 variants and 7417 people pass filters and QC.
+Note: No phenotypes present.
+--recode ped to myplink.ped + myplink.map ... done.
+mo367@AG-PBG-92GML7L Plantarchitect_PLINK % plink --vcf BreedBaseGenotypes.vcf.gz --maf 0.05 --recode --const-fid [0] --out myplink
+zsh: no matches found: [0]
+*mo367@AG-PBG-92GML7L Plantarchitect_PLINK % plink --vcf BreedBaseGenotypes.vcf.gz --maf 0.05 --recode --const-fid '0' --out myplink
+PLINK v1.90b7 64-bit (16 Jan 2023)             www.cog-genomics.org/plink/1.9/
+(C) 2005-2023 Shaun Purcell, Christopher Chang   GNU General Public License v3
+Logging to myplink.log.
+Options in effect:
+  --const-fid 0
+  --maf 0.05
+  --out myplink
+  --recode
+  --vcf BreedBaseGenotypes.vcf.gz
+
+16384 MB RAM detected; reserving 8192 MB for main workspace.
+--vcf: myplink-temporary.bed + myplink-temporary.bim + myplink-temporary.fam
+written.
+61239 variants loaded from .bim file.
+7417 people (0 males, 0 females, 7417 ambiguous) loaded from .fam.
+Ambiguous sex IDs written to myplink.nosex .
+Using 1 thread (no multithreaded calculations invoked).
+Before main variant filters, 7417 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+Total genotyping rate is exactly 1.
+5684 variants removed due to minor allele threshold(s)
+(--maf/--max-maf/--mac/--max-mac).
+55555 variants and 7417 people pass filters and QC.
+Note: No phenotypes present.
+--recode ped to myplink.ped + myplink.map ... done.
+*mo367@AG-PBG-92GML7L Plantarchitect_PLINK %
+```

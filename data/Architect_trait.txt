@@ -1,0 +1,133 @@
+apical branching counting of number of weeks|CO_334:0000086
+branching angle visual rating 0-7|CO_334:0000080
+branching habit visual observation 1-4|CO_334:0000140
+branching level counting|CO_334:0000079
+branching level counting|month 4|COMP:0000149
+branching level counting|month 5|COMP:0000150
+branching level counting|month 6|COMP:0000151
+branching visual rating 0-3|CO_334:0000139
+days to abortion on the second branch visual observation|CO_334:0000509
+days to abortion on the third branch visual observation|CO_334:0000510
+days to first female flower open on the first branch visual observation|CO_334:0000513
+days to first female flower open on the second branch visual observation|CO_334:0000514
+days to first female flower open on the third branch visual observation|CO_334:0000515
+days to fruitset on branch 1 visual observation|CO_334:0000539
+days to fruitset on branch 2 visual observation|CO_334:0000540
+days to fruitset on branch 3 visual observation|CO_334:0000541
+days to senescence on the first branch visual observation|CO_334:0000518
+days to senescence on the second branch visual observation|CO_334:0000519
+female flower number at branching level 1 counting|CO_334:0000345
+female flower number at branching level 2 counting|CO_334:0000346
+female flower number at branching level 3 counting|CO_334:0000347
+female flower number at branching level 4 counting|CO_334:0000348
+female flower number at branching level 5 counting|CO_334:0000349
+female flower number at branching level 6 counting|CO_334:0000350
+female flower number at the first 3 branching levels counting|CO_334:0000143
+first apical branch height measurement in cm|CO_334:0000106
+first apical branch height measurement in cm|month 6|COMP:0000083
+male flower number counting on branch 1|CO_334:0000535
+male flower number counting on branch 2|CO_334:0000536
+male flower number counting on branch 3|CO_334:0000537
+number of buds on branch 1 counting|CO_334:0000531
+number of buds on branch 2 counting|CO_334:0000532
+number of buds on branch 3 counting|CO_334:0000533
+number of flowering stalks per branch level counting|CO_334:0000145
+number of flowering stalks per branch level counting|month 10|COMP:0000013
+number of forks on branching level 1 counting|CO_334:0000522
+number of forks on branching level 2 counting|CO_334:0000523
+number of forks on branching level 3 counting|CO_334:0000524
+number of fruitset on branch 1 counting|CO_334:0000543
+number of fruitset on branch 2 counting|CO_334:0000544
+number of fruitset on branch 3 counting|CO_334:0000545
+number of inflorescence on the first branch counting|CO_334:0000526
+number of inflorescence on the second branch counting|CO_334:0000527
+number of inflorescence on the third branch counting|CO_334:0000528
+number of nodes at branching level 1 counting|CO_334:0000352
+number of nodes at branching level 2 counting|CO_334:0000363
+number of nodes at branching level 3 counting|CO_334:0000368
+number of nodes at branching level 4 counting|CO_334:0000383
+number of terminal branches with inflorescence counting|CO_334:0000155
+number of terminal branches with inflorescence counting|month 3|COMP:0000009
+number of terminal branches with inflorescence counting|month 4|COMP:0000014
+number of terminal branches with inflorescence counting|month 5|COMP:0000015
+number of terminal branches with inflorescence counting|month 6|COMP:0000016
+number of terminal branches with inflorescence counting|month 7|COMP:0000017
+number of terminal branches with inflorescence counting|month 8|COMP:0000018
+number of terminal branches with inflorescence counting|month 9|COMP:0000019
+number of terminal branches with inflorescence counting|week 10|COMP:0000020
+plant height measurement in cm|CO_334:0000018
+plant height measurement in cm|month 12|COMP:0000181
+plant height measurement in cm|month 3|COMP:0000080
+plant height measurement in cm|month 4|COMP:0000120
+plant height measurement in cm|month 5|COMP:0000121
+plant height measurement in cm|month 6|COMP:0000081
+plant height measurement in cm|month 8|COMP:0000118
+plant height measurement in cm|month 9|COMP:0000082
+plant height per plot in m|CO_334:0002033
+plant height per plot in m|week 29|COMP:0000085
+plant height per plot in m|week 33|COMP:0000086
+plant height per plot in m|week 38|COMP:0000087
+plant height per plot in m|week 46|COMP:0000088
+plant height with leaf in cm|CO_334:0000123
+plant height without leaf|CO_334:0000125
+plant height without leaf|month 12|COMP:0000182
+ash content in percentage|day 1|leaf from hardwood area (lower woody stem portion)|grated raw root|COMP:0000179
+average stem length|CO_334:0000128
+dry matter content of lower stem percentage|CO_334:0000385
+plantable stem assessment|CO_334:0000126
+stem color visual scoring 1-4|CO_334:0000062
+stem cortex color visual rating 1-3|CO_334:0000261
+stem diameter measurement in cm|CO_334:0000257
+stem diameter measurement in cm|month 4|COMP:0000128
+stem diameter measurement in cm|month 5|COMP:0000129
+stem diameter measurement in cm|month 6|COMP:0000130
+stem epidermis color visual scoring 1-4|CO_334:0000262
+stem number counting|CO_334:0000129
+stem rot counting per plot|CO_334:0000133
+stem weight measurement in kg|CO_334:0000127
+stem yield estimation|CO_334:0000171
+young stem growth habit visual rating 1&2|CO_334:0000104
+young stem pubescence visual rating 0-7|CO_334:0000025
+days to first flower opens visual observation|CO_334:0000299
+female flower evaluation visual rating|CO_334:0000234
+female flower evaluation visual rating|month 4|COMP:0000029
+female flower evaluation visual rating|month 5|COMP:0000030
+female flower evaluation visual rating|month 6|COMP:0000031
+female flower evaluation visual rating|month 7|COMP:0000032
+female flower evaluation visual rating|month 8|COMP:0000033
+female flower evaluation visual rating|month 9|COMP:0000034
+female flower evaluation visual rating|week 10|COMP:0000035
+female flower incidence in proportion|CO_334:0000235
+female flower number counting on all levels|CO_334:0000272
+female flower number counting on all levels|month 3|COMP:0000050
+flowering ability visual assessment 0-3|CO_334:0000233
+flowering ability visual assessment 0-3|month 4|COMP:0000122
+flowering ability visual assessment 0-3|month 5|COMP:0000123
+flowering ability visual assessment 0-3|month 6|COMP:0000124
+flower visual rating 0&1|CO_334:0000111
+male flower number counting|CO_334:0000144
+male flower number counting|month 4|COMP:0000002
+male flower number counting|month 5|COMP:0000003
+male flower number counting|month 6|COMP:0000004
+male flower number counting|month 7|COMP:0000005
+male flower number counting|month 8|COMP:0000006
+male flower number counting|month 9|COMP:0000007
+male flower number counting on all levels|CO_334:0000274
+male flower number counting on all levels|month 3|COMP:0000021
+male flower number counting on all levels|month 4|COMP:0000022
+male flower number counting on all levels|month 5|COMP:0000023
+male flower number counting on all levels|month 6|COMP:0000024
+male flower number counting on all levels|month 7|COMP:0000025
+male flower number counting on all levels|month 8|COMP:0000026
+male flower number counting on all levels|month 9|COMP:0000027
+male flower number counting on all levels|week 10|COMP:0000028
+male flower number counting|week 10|COMP:0000008
+number of forks counting|CO_334:0000146
+average number of nodes per plot counting|CO_334:0000343
+canopy width in cm|CO_334:0002038
+total leaf area estimation|CO_334:0000426
+plant architecture visual rating 1-5|CO_334:0000099
+dry matter content percentage|CO_334:0000092
+fresh shoot weight measurement in kg per plot|CO_334:0000016
+fresh storage root weight per plot|CO_334:0000012
+plant stands harvested counting|CO_334:0000010

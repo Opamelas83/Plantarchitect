@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Opamelas83" />
+
+<meta name="date" content="2023-02-09" />
+
+<title>fieldtrialanalysis</title>
+
+<script src="site_libs/header-attrs-2.16/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<script src="site_libs/core-js-2.5.3/shim.min.js"></script>
+<script src="site_libs/react-17.0.0/react.min.js"></script>
+<script src="site_libs/react-17.0.0/react-dom.min.js"></script>
+<script src="site_libs/reactwidget-1.0.0/react-tools.js"></script>
+<script src="site_libs/htmlwidgets-1.5.4/htmlwidgets.js"></script>
+<script src="site_libs/reactable-binding-0.3.0/reactable.js"></script>
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/main/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">Plantarchitect</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="about.html">About</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">fieldtrialanalysis</h1>
+<h4 class="author">Opamelas83</h4>
+<h4 class="date">2023-02-09</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span>
+workflowr <span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
+</a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2023-02-15
+</p>
+<p>
+<strong>Checks:</strong> <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 7
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> 0
+</p>
+<p>
+<strong>Knit directory:</strong> <code>Plantarchitect/</code> <span
+class="glyphicon glyphicon-question-sign" aria-hidden="true"
+title="This is the local directory in which the code in this file was executed.">
+</span>
+</p>
+<p>
+This reproducible <a href="https://rmarkdown.rstudio.com">R Markdown</a>
+analysis was created with <a
+  href="https://github.com/workflowr/workflowr">workflowr</a> (version
+1.7.0). The <em>Checks</em> tab describes the reproducibility checks
+that were applied when the results were created. The <em>Past
+versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguptodate">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>R Markdown file:</strong> up-to-date
+</a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguptodate"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great! Since the R Markdown file has been committed to the Git
+repository, you know the exact version of the code that produced these
+results.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the
+global environment can affect the analysis in your R Markdown file in
+unknown ways. For reproduciblity it’s best to always run the code in an
+empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20230209code">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Seed:</strong>
+<code>set.seed(20230209)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20230209code"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20230209)</code> was run prior to running
+the code in the R Markdown file. Setting a seed ensures that any results
+that rely on randomness, e.g. subsampling or permutations, are
+reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Session information:</strong>
+recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package
+versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be
+confident that you successfully produced the results during this
+run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr
+project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongff460c8">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Repository version:</strong> ff460c8
+</a>
+</p>
+</div>
+<div id="strongRepositoryversionstrongff460c8"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development
+and connecting the code version to the results is critical for
+reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version ff460c8.
+See the <em>Past versions</em> tab to see a history of the changes made
+to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for
+the analysis have been committed to Git prior to generating the results
+(you can use <code>wflow_publish</code> or
+<code>wflow_git_commit</code>). workflowr only checks the R Markdown
+file, but you know if there are other scripts or data files that it
+depends on. Below is the status of the Git repository when the results
+were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .DS_Store
+    Ignored:    .Rproj.user/
+
+Untracked files:
+    Untracked:  data/ArchiPAGP.RDS
+    Untracked:  data/Archimetadata.csv
+    Untracked:  data/Architect_trait.csv
+    Untracked:  output/Trait_Table1.csv
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not
+included in this status report because it is ok for generated content to
+have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+
+<p>
+These are the previous versions of the repository in which changes were
+made to the R Markdown (<code>analysis/fieldtrialanalysis.Rmd</code>)
+and HTML (<code>docs/fieldtrialanalysis.html</code>) files. If you’ve
+configured a remote Git repository (see <code>?wflow_git_remote</code>),
+click on the hyperlinks in the table below to view the files as they
+were in that past version.
+</p>
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+File
+</th>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+<th>
+Message
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+ff460c8
+</td>
+<td>
+Opamelas83
+</td>
+<td>
+2023-02-15
+</td>
+<td>
+Publish the initial files for myproject
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+</div>
+</div>
+</div>
+<div
+id="download-phenotypic-traits-from-cassavabase-following-these-steps"
+class="section level2">
+<h2>1. Download phenotypic traits from Cassavabase following these
+steps</h2>
+<ol style="list-style-type: lower-alpha">
+<li>I downloaded all traits with the words
+“branch”/“flower”/“stem/”/“fork”/“node”/“canopy”/“leaf area/”plant
+height” to make a list of my plant architecture trait called
+“Architect_trait. .<br />
+</li>
+<li>Select the following <code>Trial Types</code> according to Luciano:
+<ul>
+<li><em>Clonal Evaluation</em>;</li>
+<li><em>Preliminary Yield Trial</em>;</li>
+<li><em>Advanced Yield Trial</em>;</li>
+<li><em>Uniform Yield Trial</em>;</li>
+<li><em>Regional Trials</em>;</li>
+<li><em>phenotyping_trial</em>.</li>
+</ul></li>
+<li>Select <code>Years</code> from 2010 to 2022.</li>
+<li>Select all the <code>trials</code> available at cassavabase after
+the filter, download the phenotypic data as “Architect_trait.csv”</li>
+</ol>
+</div>
+<div
+id="phenotypic-data-information-the-objective-is-find-a-way-to-choose-the-traits-we-will-consider-for-genomic-selection.-chek-the-list-of-the-traitsthe-number-of-trials-in-which-the-traits-were-measured.-it-can-be-evaluated-by-programm"
+class="section level2">
+<h2>2. Phenotypic data Information: The objective is Find a way to
+choose the traits we will consider for genomic selection. Chek the list
+of the traits,the number of trials in which the traits were measured. It
+can be evaluated by programm</h2>
+<div
+id="table-1-list-of-traits-and-their-number-of-trials-par-program-and-year"
+class="section level3">
+<h3>Table 1: List of traits and their number of trials par Program and
+Year</h3>
+<pre class="r"><code>library(tidyverse); library(data.table); library(reshape2);  library(reactable); library(here)</code></pre>
+<pre><code>── Attaching packages ─────────────────────────────────────── tidyverse 1.3.2 ──
+✔ ggplot2 3.3.6      ✔ purrr   0.3.5 
+✔ tibble  3.1.8      ✔ dplyr   1.0.10
+✔ tidyr   1.2.1      ✔ stringr 1.4.1 
+✔ readr   2.1.2      ✔ forcats 0.5.2 
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+
+Attaching package: &#39;data.table&#39;
+
+
+The following objects are masked from &#39;package:dplyr&#39;:
+
+    between, first, last
+
+
+The following object is masked from &#39;package:purrr&#39;:
+
+    transpose
+
+
+
+Attaching package: &#39;reshape2&#39;
+
+
+The following objects are masked from &#39;package:data.table&#39;:
+
+    dcast, melt
+
+
+The following object is masked from &#39;package:tidyr&#39;:
+
+    smiths
+
+
+here() starts at /Users/mo367/Desktop/Analy_project/Plantarchitect</code></pre>
+<pre class="r"><code>ArchiData_pheno &lt;- read.csv(file = here::here(&quot;data&quot;, &quot;Architect_trait.csv&quot;), header = T, na.strings = &quot;&quot;, skip = 2)
+ArchiData_meta &lt;- read.csv(file = here::here(&quot;data&quot;, &quot;Archimetadata.csv&quot;), header = T, na.strings = &quot;&quot;, skip = 2)
+ArchiData_meta &lt;- ArchiData_meta %&gt;% select(studyName, studyDescription,
+studyYear, studyDesign, locationDbId, locationName, trialType,
+plantingDate, harvestDate, plotWidth, plotLength, fieldSize,
+fieldTrialIsPlannedToBeGenotyped, fieldTrialIsPlannedToCross)
+ArchiData  &lt;- left_join(ArchiData_pheno,ArchiData_meta )</code></pre>
+<pre><code>Joining, by = c(&quot;studyYear&quot;, &quot;studyName&quot;, &quot;studyDescription&quot;, &quot;studyDesign&quot;,
+&quot;plotWidth&quot;, &quot;plotLength&quot;, &quot;fieldSize&quot;, &quot;fieldTrialIsPlannedToBeGenotyped&quot;,
+&quot;fieldTrialIsPlannedToCross&quot;, &quot;plantingDate&quot;, &quot;harvestDate&quot;, &quot;locationDbId&quot;,
+&quot;locationName&quot;)</code></pre>
+<pre class="r"><code>AchiData1 &lt;- ArchiData %&gt;% reshape2::melt(data = .,
+                                id.vars = c(&quot;studyYear&quot;, &quot;programDbId&quot;, &quot;programName&quot;, &quot;programDescription&quot;,
+                                                            &quot;studyDbId&quot;, &quot;studyName&quot;, &quot;trialType&quot;, &quot;studyDesign&quot;, &quot;plotWidth&quot;,
+                                                            &quot;plotLength&quot;, &quot;fieldSize&quot;, &quot;fieldTrialIsPlannedToBeGenotyped&quot;,
+                                                            &quot;fieldTrialIsPlannedToCross&quot;, &quot;plantingDate&quot;, &quot;harvestDate&quot;,
+                                                            &quot;locationDbId&quot;, &quot;locationName&quot;, &quot;germplasmDbId&quot;, &quot;germplasmName&quot;,
+                                                            &quot;germplasmSynonyms&quot;, &quot;observationLevel&quot;, &quot;observationUnitDbId&quot;,
+                                                            &quot;observationUnitName&quot;, &quot;replicate&quot;, &quot;blockNumber&quot;, &quot;plotNumber&quot;,
+                                                            &quot;rowNumber&quot;, &quot;colNumber&quot;, &quot;entryType&quot;, &quot;plantNumber&quot;),
+                                                variable.name = &quot;Trait&quot;,
+                                                value.name = &quot;Value&quot;) 
+AchiData2 &lt;- AchiData1[!is.na(AchiData1$Value),]
+saveRDS(object = AchiData2, file = here::here(&quot;data&quot;, &quot;ArchiPAGP.RDS&quot;))## Why to save like that? Why not csv? let&#39;s continue to see. 
+ArchiDatap &lt;- readRDS(here(&quot;data&quot;,&quot;ArchiPAGP.RDS&quot;))
+ArchiData3 &lt;- ArchiDatap %&gt;% select(programName, studyYear, Trait, studyName) %&gt;% unique()
+
+Table1 &lt;- table(ArchiData3$programName, ArchiData3$studyYear, ArchiData3$Trait) %&gt;% as.data.frame()
+colnames(Table1) &lt;- c(&quot;programName&quot;, &quot;Year&quot;, &quot;Trait&quot;, &quot;nb_Trials&quot;)
+Table1 &lt;- Table1[Table1$`nb_Trials`!=0,] %&gt;% 
+  filter(Trait %in% str_subset(Trait, &quot;CO&quot;))
+Table1 %&gt;% reactable(groupBy = c(&quot;Trait&quot;, &quot;programName&quot;), columns = list(
+  &quot;nb_Trials&quot; = colDef(aggregate = &quot;sum&quot;)), defaultPageSize = 15)</code></pre>
+<div id="htmlwidget-9eafde08371a6feea6b8" class="reactable html-widget" style="width:auto;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-9eafde08371a6feea6b8">{"x":{"tag":{"name":"Reactable","attribs":{"data":{"programName":["CIAT","CIAT","IITA","IITA","NaCRRI","IITA","IITA","CIAT","CIAT","CIAT","NRCRI","CIAT","IITA","NRCRI","CIAT","IITA","CIAT","IITA","NaCRRI","IITA","CIAT","IITA","CIAT","IITA","CIAT","IITA","CIAT","IITA","CIAT","IITA","CIAT","IITA","NRCRI","IITA","NaCRRI","IITA","IITA","CIAT","NRCRI","CIAT","NRCRI","CIAT","NRCRI","CIAT","IITA","NRCRI","CIAT","IITA","CIAT","IITA","IITA","NRCRI","CIAT","IITA","NRCRI","CIAT","IITA","NRCRI","CIAT","IITA","NRCRI","CIAT","IITA","NRCRI","CIAT","IITA","IITA","IITA","NRCRI","Embrapa","Embrapa","IITA","Embrapa","IITA","Embrapa","Embrapa","CIAT","Embrapa","NaCRRI","NaCRRI","NaCRRI","CIAT","NRCRI","CIAT","IITA","NRCRI","CIAT","NRCRI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","CIAT","IITA","CIAT","NRCRI","CIAT","Embrapa","NRCRI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","CIAT","Embrapa","IITA","NRCRI","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","NRCRI","TARI","CIAT","Embrapa","IITA","NRCRI","TARI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","NRCRI","CIAT","Embrapa","IITA","IITA","Embrapa","TARI","TARI","TARI","Embrapa","TARI","IITA","TARI","IITA","TARI","IITA","IITA","TARI","TARI","IITA","IITA","IITA","IITA","IITA","CIAT","CIAT","CIAT","IITA","CIAT","NRCRI","CIAT","CIAT","CIAT","CIAT","CIAT","CIAT","CIAT","IITA","NRCRI","Embrapa","Embrapa","Embrapa","IITA","IITA","IITA","IITA","IITA","IITA","IITA","Embrapa","Embrapa","Embrapa","Embrapa","Embrapa","IITA","IITA"],"Year":["2020","2021","2014","2015","2015","2020","2021","2010","2011","2012","2012","2013","2013","2013","2014","2014","2015","2015","2015","2016","2017","2017","2018","2018","2019","2019","2020","2020","2021","2021","2022","2022","2011","2021","2015","2014","2015","2010","2010","2011","2011","2012","2012","2013","2013","2013","2014","2014","2015","2015","2016","2016","2017","2017","2017","2018","2018","2018","2019","2019","2019","2020","2020","2020","2021","2021","2022","2014","2016","2013","2014","2014","2015","2015","2018","2019","2021","2021","2015","2015","2015","2010","2010","2011","2011","2011","2012","2012","2013","2013","2013","2013","2014","2014","2014","2014","2015","2015","2015","2015","2016","2016","2016","2016","2017","2017","2017","2017","2018","2018","2018","2018","2019","2019","2019","2019","2020","2020","2020","2020","2021","2021","2021","2022","2022","2010","2010","2011","2011","2011","2012","2012","2012","2012","2013","2013","2013","2013","2014","2014","2014","2015","2015","2015","2015","2016","2016","2016","2017","2017","2017","2017","2017","2018","2018","2018","2018","2018","2019","2019","2019","2019","2020","2020","2020","2020","2021","2021","2021","2022","2019","2017","2018","2019","2021","2017","2018","2018","2019","2019","2020","2018","2018","2019","2020","2021","2018","2018","2018","2010","2011","2012","2012","2013","2013","2014","2015","2017","2018","2019","2020","2021","2012","2013","2018","2019","2019","2012","2014","2020","2022","2018","2019","2021","2020","2018","2019","2020","2021","2017","2014"],"Trait":["branching.angle.in.degrees.CO_334.0002082","branching.angle.in.degrees.CO_334.0002082","branching.habit.visual.observation.1.4.CO_334.0000140","branching.habit.visual.observation.1.4.CO_334.0000140","branching.habit.visual.observation.1.4.CO_334.0000140","branching.habit.visual.observation.1.4.CO_334.0000140","branching.habit.visual.observation.1.4.CO_334.0000140","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.level.counting.CO_334.0000079","branching.visual.rating.0.3.CO_334.0000139","branching.visual.rating.0.3.CO_334.0000139","female.flower.evaluation.visual.rating.CO_334.0000234","female.flower.incidence.in.proportion.CO_334.0000235","female.flower.incidence.in.proportion.CO_334.0000235","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","first.apical.branch.height.measurement.in.cm.CO_334.0000106","flower.visual.rating.0.1.CO_334.0000111","flower.visual.rating.0.1.CO_334.0000111","flowering.ability.visual.assessment.0.3.CO_334.0000233","flowering.ability.visual.assessment.0.3.CO_334.0000233","flowering.ability.visual.assessment.0.3.CO_334.0000233","flowering.ability.visual.assessment.0.3.CO_334.0000233","flowering.ability.visual.assessment.0.3.CO_334.0000233","flowering.ability.visual.assessment.0.3.CO_334.0000233","flowering.ability.visual.assessment.0.3.CO_334.0000233","flowering.ability.visual.assessment.0.3.CO_334.0000233","flowering.ability.visual.assessment.0.3.CO_334.0000233","male.flower.number.counting.on.all.levels.CO_334.0000274","number.of.flowering.stalks.per.branch.level.counting.CO_334.0000145","number.of.terminal.branches.with.inflorescence.counting.CO_334.0000155","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.architecture.visual.rating.1.5.CO_334.0000099","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.CO_334.0000018","plant.height.measurement.in.cm.month.12.COMP.0000181","plant.height.measurement.in.cm.month.3.COMP.0000080","plant.height.measurement.in.cm.month.3.COMP.0000080","plant.height.measurement.in.cm.month.3.COMP.0000080","plant.height.measurement.in.cm.month.4.COMP.0000120","plant.height.measurement.in.cm.month.6.COMP.0000081","plant.height.measurement.in.cm.month.6.COMP.0000081","plant.height.measurement.in.cm.month.6.COMP.0000081","plant.height.measurement.in.cm.month.6.COMP.0000081","plant.height.measurement.in.cm.month.6.COMP.0000081","plant.height.measurement.in.cm.month.6.COMP.0000081","plant.height.measurement.in.cm.month.9.COMP.0000082","plant.height.measurement.in.cm.month.9.COMP.0000082","plant.height.measurement.in.cm.month.9.COMP.0000082","plant.height.measurement.in.cm.month.9.COMP.0000082","plant.height.measurement.in.cm.month.9.COMP.0000082","plant.height.per.plot.in.m.week.33.COMP.0000086","plant.height.per.plot.in.m.week.38.COMP.0000087","plant.height.per.plot.in.m.week.46.COMP.0000088","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.with.leaf.in.cm.CO_334.0000123","plant.height.without.leaf.CO_334.0000125","plant.height.without.leaf.CO_334.0000125","plant.height.without.leaf.CO_334.0000125","plant.height.without.leaf.CO_334.0000125","plant.height.without.leaf.month.12.COMP.0000182","plantable.stem.assessment.CO_334.0000126","stem.color.visual.scoring.1.4.CO_334.0000062","stem.color.visual.scoring.1.4.CO_334.0000062","stem.color.visual.scoring.1.4.CO_334.0000062","stem.diameter.measurement.in.cm.CO_334.0000257","stem.diameter.measurement.in.cm.CO_334.0000257","stem.diameter.measurement.in.cm.CO_334.0000257","stem.epidermis.color.visual.scoring.1.4.CO_334.0000262","stem.number.counting.CO_334.0000129","stem.number.counting.CO_334.0000129","stem.number.counting.CO_334.0000129","stem.number.counting.CO_334.0000129","stem.weight.measurement.in.kg.CO_334.0000127","young.stem.growth.habit.visual.rating.1.2.CO_334.0000104"],"nb_Trials":[5,2,3,2,7,1,5,35,34,58,1,38,6,1,72,11,4,5,7,29,17,28,17,31,22,30,14,16,23,14,3,1,1,5,7,3,5,35,1,34,1,58,2,38,6,3,72,31,8,35,57,1,17,83,2,19,69,16,23,48,14,14,37,15,32,25,1,3,1,3,1,3,5,5,8,2,1,22,7,7,7,38,5,37,1,5,62,4,49,7,14,11,74,6,43,1,58,13,69,5,9,8,68,3,38,5,91,9,34,12,74,20,69,15,48,28,28,20,26,21,47,22,15,4,1,35,4,34,2,4,58,5,1,2,38,7,4,6,72,8,12,8,13,8,1,8,47,2,17,5,41,8,4,19,13,67,21,6,23,18,50,28,14,21,42,20,22,24,30,3,1,14,8,13,8,3,9,9,3,7,2,9,3,6,9,3,1,1,1,35,34,58,1,38,1,72,2,6,11,20,11,18,1,1,1,1,1,1,10,1,1,6,6,1,1,8,14,20,24,2,1]},"columns":[{"accessor":"programName","name":"programName","type":"factor"},{"accessor":"Year","name":"Year","type":"factor"},{"accessor":"Trait","name":"Trait","type":"factor"},{"accessor":"nb_Trials","name":"nb_Trials","type":"numeric","aggregate":"sum"}],"pivotBy":["Trait","programName"],"defaultPageSize":15,"paginationType":"numbers","showPageInfo":true,"minRows":1,"dataKey":"2565d010ee03f97be2e87d6d862f07ca"},"children":[]},"class":"reactR_markup"},"evals":[],"jsHooks":[]}</script>
+<pre class="r"><code>write_csv(Table1, &quot;output/Trait_Table1.csv&quot;)</code></pre>
+</div>
+</div>
+<div
+id="this-step-is-to-filter-the-trait-and-keep-those-measured-in-more-than-50-trials.-i-would-filter-up-to-100-but-some-important-traits-related-to-flowering-and-stem-have-trials-number-under-100."
+class="section level2">
+<h2>3. This step is to filter the trait and keep those measured in more
+than 50 trials. I would filter up to 100 but some important traits
+related to flowering and stem have trials number under 100.</h2>
+<div id="table2-table-of-trait-with-50-trials-or-more"
+class="section level3">
+<h3>Table2: Table of trait with 50 trials or more</h3>
+<pre class="r"><code>Table22 &lt;- ArchiData3 %&gt;% 
+  select(Trait, studyName) %&gt;%
+  filter(Trait %in% str_subset(Trait, &quot;CO&quot;)) %&gt;%
+  group_by(Trait) %&gt;% 
+  summarise(nb_Trials=n())
+Table2 &lt;- Table22 %&gt;% filter(nb_Trials &gt;= 50)</code></pre>
+</div>
+</div>
+<div id="making-my-data-set-with-with-the-selected-trait"
+class="section level2">
+<h2>4. Making my data set with with the selected trait</h2>
+<pre class="r"><code>Mytraits &lt;- Table2 %&gt;% select(Trait) %&gt;% as.data.frame() 
+Mytraits &lt;- transpose(Mytraits)
+names(Mytraits) &lt;- as.character(unlist(Mytraits[1,]))
+MyArchidata &lt;- ArchiData %&gt;% select(all_of(colnames(Mytraits)), studyYear, programName, studyName, trialType, studyDesign, plotWidth, plotLength, locationName, germplasmName,replicate, blockNumber, plotNumber, plantNumber) %&gt;% mutate(BranchlevelNum = branching.level.counting.CO_334.0000079,                    
+FirstBranchHeight = first.apical.branch.height.measurement.in.cm.CO_334.0000106,
+FlowerVisRate = flowering.ability.visual.assessment.0.3.CO_334.0000233,     
+PlantArchitecture = plant.architecture.visual.rating.1.5.CO_334.0000099,        
+PlantHeight = plant.height.measurement.in.cm.CO_334.0000018,              
+PlantHeightLeaf = plant.height.with.leaf.in.cm.CO_334.0000123,                
+StemNum = stem.number.counting.CO_334.0000129,
+Location = locationName,
+Year = studyYear,
+trialType = case_when(trialType == &quot;Uniform Yield Trial&quot; ~ &quot;UYT&quot;,
+                      trialType == &quot;Clonal Evaluation&quot; ~ &quot;CET&quot;,
+                      trialType == &quot;Advanced Yield Trial&quot; ~ &quot;AYT&quot;,
+                      trialType == &quot;Preliminary Yield Trial&quot; ~ &quot;PYT&quot;,
+                      trialType == &quot;Regional Trials&quot; ~ &quot;RT&quot;,
+                      trialType == &quot;phenotyping_trial&quot; ~ &quot;PeT&quot;),
+Periode = ifelse(Year &lt;= 2015,
+                                  yes = &quot;Before_2015&quot;,
+                                  no = &quot;After_2015&quot;),
+
+                     .keep = &quot;unused&quot;) %&gt;% 
+  filter(!(is.na(trialType))) %&gt;% 
+  mutate(BranchlevelNum = as.numeric(BranchlevelNum),
+         FlowerVisRate = as.numeric(FlowerVisRate),
+         PlantArchitecture = as.numeric(PlantArchitecture),
+         PlantHeightLeaf = round(as.numeric(PlantHeightLeaf), digits = 1),
+         PlantHeight = round(as.numeric(PlantHeight), digits = 1),
+         FirstBranchHeight = round(as.numeric(FirstBranchHeight), digits = 1),
+         StemNum = as.numeric(StemNum)) %&gt;%
+  filter(PlantHeight &lt; 1000 | is.na(PlantHeight)) %&gt;%
+  filter(BranchlevelNum &lt; 10 | is.na(BranchlevelNum)) %&gt;%
+  filter(FirstBranchHeight &lt; 600 | is.na(FirstBranchHeight)) %&gt;%
+  filter(StemNum &lt; 10 | is.na(StemNum)) </code></pre>
+<p>Data distribution visualization</p>
+<pre class="r"><code> ArchiQuanttraits &lt;- c(&quot;BranchlevelNum&quot;, &quot;FirstBranchHeight&quot;, &quot;PlantHeight&quot;, &quot;PlantHeightLeaf&quot;, &quot;StemNum&quot;)
+
+ArchiQuantdistri &lt;- MyArchidata %&gt;%
+     # Convert the data to &quot;long format&quot; 
+     pivot_longer(cols = all_of(ArchiQuanttraits), 
+                  names_to = &quot;Trait&quot;, values_to = &quot;ArchiQuantValue&quot;) %&gt;%
+     filter(!is.na(ArchiQuantValue))
+
+ArchiQuantdistri$trialType &lt;- factor(ArchiQuantdistri$trialType, 
+                                      levels = c(&quot;CET&quot;, &quot;PYT&quot;, &quot;AYT&quot;, &quot;UYT&quot;, &quot;PeT&quot;, &quot;RT&quot;)) # Reordering group factor levels
+ArchiQuantdistri$Trait &lt;- factor(ArchiQuantdistri$Trait,      
+                        levels = c(&quot;PlantHeight&quot;, &quot;PlantHeightLeaf&quot;, &quot;FirstBranchHeight&quot;, &quot;BranchlevelNum&quot;, &quot;StemNum&quot;))
+
+ggplot(data = ArchiQuantdistri,
+                             aes(x=trialType,y=ArchiQuantValue, fill = Trait)) +
+  geom_boxplot(stat = &quot;boxplot&quot;) +
+  stat_summary(fun=mean, na.rm = TRUE) +
+  labs(x= &quot;Tria type&quot;, y= &quot;Values&quot;) + theme_bw() +
+    facet_grid(Trait~trialType, scales = &quot;free&quot;)</code></pre>
+<pre><code>Warning: Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).
+Removed 1 rows containing missing values (geom_segment).</code></pre>
+<p><img src="figure/fieldtrialanalysis.Rmd/unnamed-chunk-4-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>#For qualitative trait
+MyArchidata$trialType &lt;- factor(MyArchidata$trialType, 
+                                      levels = c(&quot;CET&quot;, &quot;PYT&quot;, &quot;AYT&quot;, &quot;UYT&quot;, &quot;PeT&quot;, &quot;RT&quot;))
+
+ggplot(MyArchidata, aes(x = FlowerVisRate, fill = trialType)) +
+   geom_bar(position = &quot;dodge&quot;) +
+   xlim(0,6) +
+   labs(x= &quot;FlowerVisRate&quot;, y= &quot;Value&quot;) + theme_bw()</code></pre>
+<pre><code>Warning: Removed 204636 rows containing non-finite values (stat_count).</code></pre>
+<pre><code>Warning: Removed 2 rows containing missing values (geom_bar).</code></pre>
+<p><img src="figure/fieldtrialanalysis.Rmd/unnamed-chunk-4-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>ggplot(MyArchidata, aes(x = PlantArchitecture, fill = trialType)) +
+   geom_bar(position = &quot;dodge&quot;) +
+   xlim(0,6) +
+   labs(x= &quot;PlantArchitecture&quot;, y= &quot;Value&quot;) + theme_bw()</code></pre>
+<pre><code>Warning: Removed 32355 rows containing non-finite values (stat_count).</code></pre>
+<p><img src="figure/fieldtrialanalysis.Rmd/unnamed-chunk-4-3.png" width="672" style="display: block; margin: auto;" /></p>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span>
+Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.2.1 (2022-06-23)
+Platform: x86_64-apple-darwin17.0 (64-bit)
+Running under: macOS Big Sur ... 10.16
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.2/Resources/lib/libRblas.0.dylib
+LAPACK: /Library/Frameworks/R.framework/Versions/4.2/Resources/lib/libRlapack.dylib
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+ [1] here_1.0.1        reactable_0.3.0   reshape2_1.4.4    data.table_1.14.2
+ [5] forcats_0.5.2     stringr_1.4.1     dplyr_1.0.10      purrr_0.3.5      
+ [9] readr_2.1.2       tidyr_1.2.1       tibble_3.1.8      ggplot2_3.3.6    
+[13] tidyverse_1.3.2   workflowr_1.7.0  
+
+loaded via a namespace (and not attached):
+ [1] fs_1.5.2            lubridate_1.8.0     bit64_4.0.5        
+ [4] httr_1.4.4          rprojroot_2.0.3     tools_4.2.1        
+ [7] backports_1.4.1     bslib_0.4.0         utf8_1.2.2         
+[10] R6_2.5.1            DBI_1.1.3           colorspace_2.0-3   
+[13] withr_2.5.0         tidyselect_1.2.0    processx_3.8.0     
+[16] bit_4.0.4           compiler_4.2.1      git2r_0.30.1       
+[19] cli_3.4.1           rvest_1.0.3         xml2_1.3.3         
+[22] labeling_0.4.2      sass_0.4.2          scales_1.2.1       
+[25] callr_3.7.3         digest_0.6.30       rmarkdown_2.16     
+[28] pkgconfig_2.0.3     htmltools_0.5.3     highr_0.9          
+[31] dbplyr_2.2.1        fastmap_1.1.0       htmlwidgets_1.5.4  
+[34] rlang_1.0.6         readxl_1.4.1        rstudioapi_0.14    
+[37] jquerylib_0.1.4     generics_0.1.3      farver_2.1.1       
+[40] jsonlite_1.8.3      crosstalk_1.2.0     vroom_1.5.7        
+[43] googlesheets4_1.0.1 magrittr_2.0.3      Rcpp_1.0.9         
+[46] munsell_0.5.0       fansi_1.0.3         lifecycle_1.0.3    
+[49] stringi_1.7.8       whisker_0.4         yaml_2.3.6         
+[52] plyr_1.8.7          grid_4.2.1          parallel_4.2.1     
+[55] promises_1.2.0.1    crayon_1.5.2        haven_2.5.1        
+[58] hms_1.1.2           knitr_1.40          ps_1.7.2           
+[61] pillar_1.8.1        reprex_2.0.2        glue_1.6.2         
+[64] evaluate_0.18       getPass_0.2-2       modelr_0.1.9       
+[67] vctrs_0.5.0         tzdb_0.3.0          httpuv_1.6.6       
+[70] cellranger_1.1.0    gtable_0.3.1        reactR_0.4.4       
+[73] assertthat_0.2.1    cachem_1.0.6        xfun_0.34          
+[76] broom_1.0.1         later_1.3.0         googledrive_2.0.0  
+[79] gargle_1.2.1        ellipsis_0.3.2     </code></pre>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+https://docs.mathjax.org/en/latest/web/configuration.html. This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

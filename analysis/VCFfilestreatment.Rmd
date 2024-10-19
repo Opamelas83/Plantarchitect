@@ -1,0 +1,352 @@
+---
+title: "VCFfilestreatment"
+author: "Opamelas83"
+date: "2023-04-01"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+##The genotype data have been dowloading under 10 separated files because of the size. I should joint them to make one big file ref "https://wolfemd.github.io/GenomicSelectionManual/intro-to-genomic-prediction.html"
+```{r}
+library(tidyverse); library(data.table); library(vcfR); library(genomicMateSelectR); library(magrittr); library(factoextra); library(FactoMineR)
+```
+
+```{r}
+#I cut the original vcf file in 2 parts to make easier the download.
+#split -l 5500 data/VCF/Architect_acces_final.txt data/VCF/Architect_acces_ 
+
+##mo367@AG-PBG-92GML7L ~ % cd Desktop/Analy_project/Plantarchitect/ 
+#vcftools --vcf data/BreedBaseGenotypesDownload_a.vcf  
+#VCFtools - 0.1.16
+#(C) Adam Auton and Anthony Marcketta 2009
+#Parameters as interpreted:
+#	--vcf data/BreedBaseGenotypesDownload_a.vcf
+#After filtering, kept 1165 out of 1165 Individuals
+#After filtering, kept 61239 out of a possible 61239 Sites
+#Run Time = 5.00 seconds
+#Check duplicate
+#bcftools query --list-samples data/BreedBaseGenotypes_a.vcf 
+#Duplicated sample name 'IITA-TMS-IBA000070'
+#Write just the column-names of the VCF to disk.
+#egrep "^#CHROM" data/BreedBaseGenotypesDownload_a.vcf | head -n1 > data/vcf_colnames.txt
+```
+
+```{r}
+#After download vcf file from Cassavabase (10 subseted vcf file; a,b,c...)
+vcf_sample_names<-readLines("data/vcf_colnames.txt") %>% 
+     strsplit(.,"\t") %>% unlist() %>% 
+     .[10:length(.)]
+# Check how many sample names are duplicated?
+#table(duplicated(vcf_sample_names))
+#1100    65 
+```
+
+```{r}
+# create unique names for each VCF
+unique_names_for_vcf<-tibble(vcfName=vcf_sample_names) %>% 
+     # create an overall index to ensure I can recover the original column order
+     mutate(vcfIndex=1:n()) %>% 
+     # now for each vcfName create an sub-index, to distinguish among duplicates
+     group_by(vcfName) %>% 
+     # sub-index
+     mutate(vcfNameIndex=1:n(),
+            # For the first (or only) instance of each unique vcfName
+            vcfName_Unique=ifelse(vcfNameIndex==1,
+                                  # return the original name
+                                  vcfName,
+                                  # for all subsequent (duplicate) names, 
+                                  #put a unique-ified name by pasting the sub-index
+                                  paste0(vcfName,".",vcfNameIndex)))
+# Write the "unique_names_for_vcf.txt" to disk
+write.table(unique_names_for_vcf$vcfName_Unique,file = "data/unique_names_for_vcf.txt",
+            row.names = F, col.names = F, quote = F)
+# Create also a list containing only one instance of each unique name, the first instance 
+subset_unique_names_for_vcf<-unique_names_for_vcf %>% 
+     filter(vcfNameIndex==1) %$%
+     vcfName_Unique
+# Write that list to disk for subsetting the VCF downstream
+write.table(subset_unique_names_for_vcf,file = "data/subset_unique_names_for_vcf.txt",
+            row.names = F, col.names = F, quote = F)
+```
+
+```{r}
+# replace sample names in original VCF with unique ones (creates a new VCF)
+#bcftools reheader --samples data/unique_names_for_vcf.txt data/VCF/BreedBaseGenotypesDownload_a.vcf > data/BreedBaseGenotypesDownload_1.vcf;
+# overwrite the original VCF with the new  that has unique names
+#mv data/BreedBaseGenotypesDownload_1.vcf data/VCF/BreedBaseGenotypesDownload_a.vcf;
+# check that the names are now unique by printing sample list
+#Plantarchitect % bcftools query --list-samples data/VCF/BreedBaseGenotypesDownload_a.vcf
+#vcftools --vcf data/VCF/BreedBaseGenotypesDownload_a.vcf --keep data/subset_unique_names_for_vcf.txt --recode --stdout | bgzip -c > data/VCF/BreedBaseGenotypes_subset_a.vcf.gz
+####more
+mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --vcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
+mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --vcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
+mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --vcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recodemo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --gzvcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
+mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --gzvcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
+#mo367@AG-PBG-92GML7L Plantarchitect_PLINK % bcftools query -l BreedBaseGenotypesM.vcf.gz > vcf_colnames.txt  
+Myheader <- readLines("/Users/mo367/Desktop/Plantarchitect_PLINK/vcf_colnames.txt")
+Myheader1 <- tibble(Myheader)
+Myheader1$Myheader <- gsub(pattern = "-", replacement = "", x = Myheader1$Myheader)
+Myheader1$Myheader <- gsub(pattern = " ", replacement = "", x = Myheader1$Myheader)
+Myheader1$Myheader <- gsub(pattern = "[[:punct:]]", replacement = "", x = Myheader1$Myheader)
+write.table(Myheader1$Myheader, file = "/Users/mo367/Desktop/Plantarchitect_PLINK/Myheader.txt",
+            row.names = F, col.names = F, quote = F)
+```
+
+Shell command
+```{r}
+##shell for merging my vcf files. 
+#bcftools index BreedBaseGenotypes_subset_a.vcf.gz && bcftools index BreedBaseGenotypes_subset_b.vcf.gz && bcftools index BreedBaseGenotypes_subset_c.vcf.gz && bcftools index BreedBaseGenotypes_subset_d.vcf.gz && bcftools index BreedBaseGenotypes_subset_e.vcf.gz && bcftools index BreedBaseGenotypes_subset_f.vcf.gz && bcftools index BreedBaseGenotypes_subset_g.vcf.gz && bcftools index BreedBaseGenotypes_subset_h.vcf.gz && bcftools index BreedBaseGenotypes_subset_i.vcf.gz && bcftools index BreedBaseGenotypes_subset_j.vcf.gz
+##Then run 
+#bcftools merge BreedBaseGenotypes_subset_a.vcf.gz BreedBaseGenotypes_subset_b.vcf.gz BreedBaseGenotypes_subset_c.vcf.gz  BreedBaseGenotypes_subset_d.vcf.gz BreedBaseGenotypes_subset_e.vcf.gz BreedBaseGenotypes_subset_f.vcf.gz BreedBaseGenotypes_subset_g.vcf.gz BreedBaseGenotypes_subset_h.vcf.gz BreedBaseGenotypes_subset_i.vcf.gz BreedBaseGenotypes_subset_j.vcf.gz > BreedBaseGenotypes.vcf.gz
+# removing a list of genotypes 
+#vcftools --gzvcf data/VCF/BreedBaseGenotypes.vcf.gz --keep data/Architect_acces_final.txt --recode --stdout | bgzip -c > data/VCF/BreedBaseGenotypes_subset.vcf.gz(txt is the list of my genotype)
+#vcftools --gzvcf data/VCF/BreedBaseGenotypes_subset.vcf.gz
+```
+#For my training
+```{r}
+#mo367@AG-PBG-92GML7L Plantarchitect % bcftools query --list-samples data/BreedBaseGenotypesDownload_a.vcf
+#convert to a vcf.gz format, because the file is not a real vcf file
+# Plantarchitect % bcftools view -O z -o data/BreedBaseGenotypes_subset.vcf.gz data/BreedBaseGenotypesDownload_a.vcf 
+```
+
+```{r}
+#Extract haplotypes from VCF with bcftools convert --hapsample
+#bcftools convert --hapsample data/BreedBaseGenotypes_subset data/BreedBaseGenotypes_subset.vcf.gz
+#Hap file: data/BreedBaseGenotypes_subset.hap.gz
+#Sample file: data/BreedBaseGenotypes_subset.samples
+#[W::vcf_parse_format] FORMAT 'NT' at 1:21745 is not defined in the header, assuming Type=String
+#61239 records written, 0 skipped: 0/0/0 no-ALT/non-biallelic/filtered
+```
+
+```{r}
+phenos <- read_csv("data/MyArchiphenos_final.csv")
+germplasm_with_phenos<-unique(phenos$germplasmName)
+subset_unique_names_for_vcf<-read.table(file = "data/subset_unique_names_for_vcf.txt", stringsAsFactors = F)$V1
+table(germplasm_with_phenos %in% subset_unique_names_for_vcf)
+#FALSE  TRUE 
+#12080  5933
+#geno and pheno
+subset_unique_names_for_vcf[subset_unique_names_for_vcf %in% germplasm_with_phenos]
+#5933
+#pheno not geno
+germplasm_with_phenos[!germplasm_with_phenos %in% subset_unique_names_for_vcf]
+#[12080]
+subset_unique_names_for_vcf[!subset_unique_names_for_vcf %in% germplasm_with_phenos]
+#[4924]
+```
+#Filter VCF file for keeping geno with pheno
+```{r}
+#egrep "^#CHROM" data/VCF/BreedBaseGenotypes.vcf.gz | head -n1 > data/VCF/vcf_colnamesT.txt
+vcf_sample_names<-readLines("data/vcf_colnamesT.txt") %>% 
+     strsplit(.,"\t") %>% unlist() %>% 
+     .[10:length(.)]
+vcf_names <- tibble(germplasmName=vcf_sample_names)
+phenos <- read_csv("data/MyArchiphenos_final.csv")
+phenos_germ <- phenos %>% dplyr::select(germplasmName)
+shapephenos <- read_csv("data/Shapephenos_filtered.csv")
+shapephenos_germ <- shapephenos %>% dplyr::select(germplasmName)
+totalphenos <- bind_rows(phenos_germ,shapephenos_germ)
+phenosID <- tibble(unique(totalphenos))
+#make my list for further analysis
+germplasm_with_pheno <- inner_join(vcf_names, phenosID)
+#germplasm_with_pheno$germplasmName# 7417 
+write.table(germplasm_with_pheno$germplasmName,file = "data/germplasm_with_pheno.txt",
+            row.names = F, col.names = F, quote = F)
+#vcftools --gzvcf data/VCF_old/BreedBaseGenotypes.vcf.gz --keep data/germplasm_with_pheno.txt --recode --stdout | bgzip -c > data/VCF/BreedBaseGenotypes.vcf.gz 
+```
+
+#Haplotype and dosage matrix from VCF
+```{r}
+##Shell: Extract haplotypes from VCF with bcftools
+#bcftools convert --hapsample data/VCF/BreedBaseGenotypes_subset data/VCF/BreedBaseGenotypes.vcf.gz
+#Hap file: data/VCF/BreedBaseGenotypes_subset.hap.gz
+#Sample file: data/VCF/BreedBaseGenotypes_subset.samples
+#61239 records written, 0 skipped: 0/0/0 no-ALT/non-biallelic/filtered
+library("R.utils"); library(genomicMateSelectR); library(data.table)
+#Read haps to R and format them.
+vcfName<-"BreedBaseGenotypes_subset"
+ haps<-fread(paste0("data/VCF/",vcfName,".hap.gz"),
+            stringsAsFactors = F,header = F) %>% 
+  as.data.frame
+ sampleids<-fread(paste0("data/VCF/",vcfName,".samples"),
+                 stringsAsFactors = F,header = F,skip = 2) %>% 
+  as.data.frame
+hapids<-sampleids %>% 
+     dplyr::select(V1,V2) %>% 
+     mutate(SampleIndex=1:nrow(.)) %>% 
+     rename(HapA=V1,HapB=V2) %>% 
+     pivot_longer(cols=c(HapA,HapB),
+                  names_to = "Haplo",values_to = "SampleID") %>% 
+     mutate(HapID=paste0(SampleID,"_",Haplo)) %>% 
+     arrange(SampleIndex)
+colnames(haps)<-c("Chr","HAP_ID","Pos","REF","ALT",hapids$HapID)
+dim(haps)
+#61239 21721
+haps %<>% 
+     mutate(HAP_ID=gsub(":","_",HAP_ID)) %>% 
+     column_to_rownames(var = "HAP_ID") %>% 
+     dplyr::select(-Chr,-Pos,-REF,-ALT) %>% 
+     t(.) %>% 
+     as.matrix(.)
+dim(haps)
+# 21716 61239
+##The counted allele in the dosage matrix, which will be used downstream to construct kinship matrices and estimate marker effects, should be the ALT allele. This will ensure a match to the haplotype matrix, where a “1” indicates the presence of the ALT allele.Here’s atidyverse-based approach, using group_by() plus summarise() to sum the two haplotypes for each individual across all loci.(From Marnin)
+
+dosages<-haps %>%
+     as.data.frame(.) %>% 
+     rownames_to_column(var = "GID") %>% 
+     separate(GID,c("SampleID","Haplo"),"_Hap",remove = T) %>% 
+     dplyr::select(-Haplo) %>% 
+     group_by(SampleID) %>% 
+     summarise(across(everything(),~sum(.))) %>% 
+     ungroup() %>% 
+     column_to_rownames(var = "SampleID") %>% 
+     as.matrix %>% 
+     # preserve same order as in haps
+     .[sampleids$V1,]
+
+dim(dosages)
+#[1] 10858 61239
+```
+
+Variant filters
+```{r}
+# In this case, simple: keep only positions with >1% minor allele frequency.
+dosages<-maf_filter(dosages,thresh = 0.01)
+dim(dosages)
+#[1] 10858 61158
+haps<-haps[,colnames(dosages) ]
+
+saveRDS(dosages,file=here::here("data","dosages.rds"))
+saveRDS(haps,file=here::here("data","haplotypes.rds"))
+```
+
+#Genomic Relationship matrices (GRMs)#genomicMateSelectR function kinship() to construct additive (A) and dominance (D) relationship matrices.
+```{r}
+A<-kinship(dosages,type="add")
+D<-kinship(dosages,type="domGenotypic")
+D<-kinship(dosages,type="domClassic")
+
+ saveRDS(A,file=here::here("output","kinship_add.rds"))
+ saveRDS(D,file=here::here("output","kinship_dom.rds"))
+ saveRDS(D,file=here::here("output","kinship_AD.rds"))
+# In this case, simple: keep only positions with >1% minor allele frequency.
+```
+
+#Recombination Frequency Matrix: source a single genome-wide file representing the ICGMC concensus genetic map on the V6 Cassava Reference genome. The file is on the Cassavabase FTP-archive
+```{r}
+genmap<-read.table("https://cassavabase.org/ftp/marnin_datasets/NGC_BigData/CassavaGeneticMap/cassava_cM_pred.v6.allchr.txt",
+                   header = F, sep=';', stringsAsFactors = F) %>% 
+     rename(SNP_ID=V1,Pos=V2,cM=V3) %>% 
+  as_tibble
+genmap %>% dim
+#[1] 120979      3
+
+snps_genmap<-tibble(DoseSNP_ID=colnames(dosages)) %>% 
+     separate(DoseSNP_ID,c("Chr","Pos","Ref","Alt"),remove = F) %>% 
+     mutate(SNP_ID=paste0("S",Chr,"_",Pos)) %>% 
+     full_join(genmap %>% 
+                    separate(SNP_ID,c("Chr","POS"),"_",remove = F) %>% 
+                   dplyr::select(-POS) %>% 
+                    mutate(Chr=gsub("S","",Chr)) %>% 
+                    mutate(across(everything(),as.character)))
+ library(ggplot2)
+jpeg(filename = "output/snp_genmap_map.jpeg") 
+snps_genmap %>% 
+  ggplot(.,aes(x=as.integer(Pos)/1000/1000,y=as.numeric(cM))) +
+  geom_point() +
+  theme_bw() +
+  facet_wrap(~as.integer(Chr))
+dev.off()
+
+```
+#Interpolate genetic map
+```{r}
+interpolate_genmap<-function(data){
++ data_forspline<-data %>% 
+    filter(!is.na(cM)) %>% 
+    mutate(cumMax=cummax(cM),
+           cumIncrement=cM-cumMax) %>% 
+    filter(cumIncrement>=0) %>% 
+    dplyr::select(-cumMax,-cumIncrement)
+  
+  spline<-data_forspline %$% smooth.spline(x=Pos,y=cM,spar = 0.75)
+  
+  splinemap<-predict(spline,x = data$Pos) %>% 
+    as_tibble(.) %>% 
+    rename(Pos=x,cM=y) %>% 
+    mutate(cumMax=cummax(cM),
+           cumIncrement=cM-cumMax) %>% 
+    mutate(cM=cumMax) %>% 
+    dplyr::select(-cumMax,-cumIncrement)
+  
+  return(splinemap) 
+}
+ splined_snps_genmap<-snps_genmap %>% 
+  dplyr::select(-cM) %>% 
+  mutate(Pos=as.numeric(Pos)) %>% 
+  left_join(snps_genmap %>% 
+              mutate(across(c(Pos,cM),as.numeric)) %>% 
+              arrange(Chr,Pos) %>% 
+              nest(-Chr) %>% 
+              mutate(data=map(data,interpolate_genmap)) %>% 
+              unnest(data)) %>% 
+  distinct
+all(colnames(dosages) %in% splined_snps_genmap$DoseSNP_ID)
+
+```
+
+ splined map
+```{r}
+jpeg(filename = "output/splined_map.jpeg")
+splined_snps_genmap %>% 
+     filter(DoseSNP_ID %in% colnames(dosages)) %>% 
+     mutate(Map="Spline") %>% 
+     bind_rows(snps_genmap %>% 
+                    filter(DoseSNP_ID %in% colnames(dosages),
+                           !is.na(cM)) %>% 
+                    mutate(across(c(Pos,cM),as.numeric)) %>% 
+                    arrange(Chr,Pos) %>% mutate(Map="Data")) %>% 
+  ggplot(.,aes(x=Pos/1000/1000,y=cM,color=Map, shape=Map),alpha=0.3,size=0.75) + 
+  geom_point() + 
+  theme_bw() + facet_wrap(~as.integer(Chr), scales='free_x')
+ dev.off()
+ 
+splined_snps_genmap %>% 
+     filter(DoseSNP_ID %in% colnames(dosages)) %>% 
+     saveRDS(.,file=here::here("output","interpolated_genmap.rds"))
+#Recomb. freq. matrix
+genmap<-readRDS(file=here::here("output","interpolated_genmap.rds"))
+m<-genmap$cM;
+names(m)<-genmap$DoseSNP_ID
+recombFreqMat<-1-(2*genmap2recombfreq(m,nChr = 18))
+saveRDS(recombFreqMat,file=here::here("output","recombFreqMat_1minus2c.rds"))
+
+```
+
+#Histogram of kinship matrix
+```{r}
+##call the Kinship matrix. The matrix was constructed using the same formula implemented in the “classic” rrBLUP function A.mat(): From VanRaden (2008), Method 1.
+A<-readRDS(file=here::here("output","kinship_add.rds"))
+#The off-diagonals express the genomic relatedness between different individuals in the dataset.
+#This formulation has a mean-value of zero, such that >0 kinship means “more than the average population level of relatedness” while <0 values mean “greater than average.”
+jpeg(filename = "output/kinship_offdiag.jpeg")
+hist(A[lower.tri(A)], main='Off-diagonal values of the kinship matrix', xlim = c(-0.5,0.7))
+dev.off()
+#The diagonal values express the relatedness of each individual to itself, which should be interpreted as the level of inbreeding (homozygosity).
+jpeg(filename = "output/kinship_diag.jpeg")
+hist(diag(A), main='Diagonals of the kinship', breaks=20)
+dev.off()
+```
+
+```{r}
+#Mydosages <- readRDS("/workdir/Plantarchitect/data/dosages.rds")
+#Mydosages_ID <- rownames(Mydosages) %>% as_tibble() %>% mutate(germplasmName = value) %>% dplyr::select(germplasmName)
+#MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE)
+#Mydosages_ID_Prog <- MyArchiphenos_final %>% group_by(germplasmName, programName) %>% summarise(programName = unique(programName))
+#Mydosages_IDprog <- left_join(Mydosages_ID, Mydosages_ID_Prog)
+#Mydosages
+#Germplas_program <- MyArchiphenos %>% dplyr::select(germplasmName, programName) 
+#res.pca <- prcomp(Mydosages) [FactoMineR package] My#
+```

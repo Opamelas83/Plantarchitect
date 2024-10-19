@@ -1,0 +1,442 @@
+---
+title: "genselect"
+author: "Opamelas83"
+date: "2023-04-11"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+```{r}
+install.packages("sommer") #new version is important (why?)
+library(tidyverse); library(data.table); library(genomicMateSelectR); library(magrittr); library(sommer)
+```
+
+##K-fold Cross validation
+```{r}
+blups<-readRDS(here::here("output","blups.rds"))
+dosages<-readRDS(file=here::here("data","dosages.rds"))
+A<-readRDS(file=here::here("output","kinship_add.rds"))
+D<-readRDS(file=here::here("output","kinship_AD.rds"))
+D<-readRDS(file=here::here("output","kinship_dom.rds"))
+grms[["D"]]<-D
+
+blups %<>% 
+     # need to rename the "blups" list to comply with the runCrossVal function
+     rename(TrainingData=BLUPs) %>% 
+     dplyr::select(Trait,TrainingData) %>% 
+     # need also to remove phenotyped-but-not-genotyped lines
+     mutate(TrainingData=map(TrainingData,
+                             ~filter(.,GermplasmName %in% rownames(A)) %>% 
+                                  # rename the germplasmName column to GID
+                                  rename(GID=GermplasmName)))
+
+blups
+## A tibble: 4 × 2
+#  Trait             TrainingData        
+#  <chr>             <list>              
+#1 BranchlevelNum    <tibble [3,113 × 6]>
+#2 FirstBranchHeight <tibble [2,698 × 6]>
+#3 PlantHeight       <tibble [3,664 × 6]>
+#4 PlantArchitecture <tibble [3,470 × 6]>
+#5 Cylindrical_type  <tibble [1,518 × 6]>
+#6 Umbrella_type     <tibble [1,045 × 6]>
+#7 Open_type         <tibble [1,164 × 6]>
+#8 Compact_type      <tibble [1,518 × 6]>
+#9 Erectibility      <tibble [1,045 × 6]>
+
+
+#For fastest, lightest compute of accuracy, remove non-phenotyped from kinship
+#gids<-blups %>% 
+#     unnest(TrainingData) %$% unique(GID)
+# dim(A) [1] 963 963
+
+#D<-D[gids,gids]
+
+```
+# selection indices:To think about 
+```{r}
+#Include selection index weights
+SIwts<-c(PlantHeight=4,
+         FirstBranchHeight=4,
+         BranchlevelNum=4,
+         PlantArchitecture=4)
+#SIwts
+```
+
+#Execute cross-validation
+```{r}
+#For A 
+standardCV<-runCrossVal(blups=blups,
+                        modelType="A",
+                        selInd=FALSE,
+                        grms=list(A=A),
+                        nrepeats=3,nfolds=5,
+                        gid="GID",seed=999999999,
+                        ncores=10)
+#For "AD"
+standardCV<-runCrossVal(blups=blups,
+                        modelType="AD",
+                        selInd=FALSE,
+                        grms=list(A=A,D=D),
+                        nrepeats=3,nfolds=5,
+                        gid="GID",seed=999999999,
+                        ncores=10)
+
+#For "DirDim"
+standardCV<-runCrossVal(blups=blups,
+                        modelType="DirDom",
+                        selInd=FALSE,
+                        grms=list(A=A,D=D),
+                        dosages=dosages,
+                        nrepeats=3,nfolds=5,
+                        gid="GID",seed=999999999,
+                        ncores=8)
+#standardCV %>% unnest(accuracyEstOut)
+#Plot result
+saveRDS(standardCV,file = here::here("output","AD_KfoldsCval.rds"))
+jpeg(filename = "output/AD_KfoldCval.jpeg")
+
+standardCV %>% 
+     unnest(accuracyEstOut) %>% 
+     mutate(Trait = factor(Trait,      
+                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum", "PlantArchitecture", "Cylindrical_type", "Umbrella_type", "Open_type", "Compact_type", "Erectibility")))%>%
+     dplyr::select(repeats,id,predOf,Trait,Accuracy) %>% 
+     ggplot(.,aes(x=Trait,y=Accuracy,fill=Trait)) + 
+  ggtitle("AD_Kfold Cross validation") +
+  geom_boxplot() + theme_bw()
+dev.off()
+# cross validation by breeding program
+# cross validation by periode 
+
+```
+
+##Predict parental breeding values
+```{r}
+blups<-readRDS(here::here("output","blups.rds"))
+A<-readRDS(file=here::here("output","kinship_add.rds"))
+
+blups %<>% 
+     # need to rename the "blups" list to comply with the runCrossVal function
+     rename(TrainingData=BLUPs) %>% 
+     dplyr::select(Trait,TrainingData) %>% 
+     # need also to remove phenotyped-but-not-genotyped lines
+     mutate(TrainingData=map(TrainingData,
+                             ~filter(.,GermplasmName %in% rownames(A)) %>% 
+                                  # rename the germplasmName column to GID
+                                  rename(GID=GermplasmName)))
+
+blups
+## A tibble: 4 × 2
+
+```
+
+```{r}
+#Include selection index weights
+SIwts<-c(PlantHeight=4,
+         FirstBranchHeight=4,
+         BranchlevelNum=4,
+         PlantArchitecture=4)
+#SIwts
+```
+
+Run genomic predictions
+```{r}
+gpreds<-runGenomicPredictions(modelType="A",
+                              selInd=TRUE, SIwts=SIwts,
+                              blups=blups,
+                              grms=list(A=A),
+                              ncores=3)
+#Extract GEBV
+gpreds
+#We have a single-row tibble. To access a simple table listing GEBV for each trait and the selection index:
+gpreds$gblups[[1]]
+
+#At this point, you can use the SELIND predictions directly to rank and select parents. Example: sort by SELIND and pick the top 10?s[[1]]
+
+gpreds$gblups[[1]] %>% 
+     arrange(desc(SELIND)) %>% 
+     slice(1:10)
+#For more detailed output, including variance component estimates:
+
+gpreds$genomicPredOut[[1]]
+
+gpreds$genomicPredOut[[1]]$varcomps[[1]]
+#>                         VarComp VarCompSE   Zratio
+
+saveRDS(gpreds,file = here::here("output","genomicPredictions.rds"))
+```
+
+#Accuracy of cross prediction
+```{r}
+ped<-read_delim(here::here("data","archi_pedigree.txt"),delim = "\t")
+# Keep only complete pedigree records
+ped %<>% 
+     dplyr::select(-Cross_Type) %>% 
+     filter(!is.na(Female_Parent),
+            !is.na(Male_Parent),
+            Female_Parent!="?",
+            Male_Parent!="?") %>% 
+     distinct
+# Number of full-sib families
+ped %>% distinct(Female_Parent,Male_Parent) %>% nrow()
+#1985
+#Summarise distribution of full-sib family sizes
+ped %>%   
+  count(Female_Parent,Male_Parent) %>% arrange(desc(n))  %>%  summary(.$n)# We need 2 members by family for this analysis (why?)
+#Full genotyped trio
+dosages<-readRDS(here::here("data","dosages.rds"))
+genotyped_gids<-rownames(dosages)
+#Are all pedigree genotyped?
+table(ped$Accession %in% genotyped_gids)
+#FALSE  TRUE 
+#  718  7982 
+#FALSE
+table(ped$Female_Parent %in% genotyped_gids)
+#FALSE  TRUE 
+# 1113  7587
+#We need only parents and descendance present in our SNP data
+genotyped_ped<-ped %>% 
+     filter(Accession %in% genotyped_gids,
+            Female_Parent %in% genotyped_gids,
+            Male_Parent %in% genotyped_gids)
+genotyped_ped %>% nrow()
+# 6512 complete trios (accessions + male parent + female parents)
+genotyped_ped %>% 
+     count(Female_Parent,Male_Parent) %>% arrange(desc(n))  %>%  summary(.$n)
+#Female_Parent      Male_Parent   looks like 1196 full-sib families.        # Length:1196        Length:1196  
+genotyped_ped %>% 
+     count(Female_Parent,Male_Parent) %>% 
+     filter(n>1)#810 families have offsprinf >1.
+
+```
+# validate pedigree There is one additional step I highly recommend and will demonstrate here.Plant breeding pedigrees can often have errors, esp. for the male (pollen) parent. For that reason, I recommend using the genomic data to check the pedigree. We do not want our estimate of family-genetic variance prediction accuracy further detrimated by the presence of incorrect pedigree entrees.There are various software options to do this, probably an R package or two. My approach uses the --genome IBD calculator in the command-line program PLINK v1.9, click here for the PLINK1.9 manual and to download/install the program.
+```{r}
+#plink --vcf VCF/BreedBaseGenotypes.vcf.gz \
+ #    --make-bed --const-fid --keep-allele-order \
+  #   --out VCF/BreedBaseGenotypes_subset
+
+#plink --bfile VCF/BreedBaseGenotypes_subset \
+#  --genome \
+ # --out ../output/BreedBaseGenotypes_subset;
+
+```
+
+```{r}
+#verify parent-offspring
+genome %>% headgenome<-read.table(here::here("output/","BreedBaseGenotypes_subset.genome"),
+                   stringsAsFactors = F,header = T) %>% 
+     as_tibble
+genome %>% head
+dim(genome)
+# 49297485       14
+ped %>% 
+     semi_join(genome %>% rename(Accession=IID1,Female_Parent=IID2)) %>% 
+     left_join(genome %>% rename(Accession=IID1,Female_Parent=IID2))
+```
+
+```{r}
+#Confirm Female_Parent - Offspring Relationship
+## In the plink genome file
+## IID1 or IID2 could be the Accession or the Female_Parent
+conf_female_ped<-genotyped_ped %>% 
+     inner_join(genome %>% 
+                     rename(Accession=IID1,Female_Parent=IID2)) %>% 
+     bind_rows(genotyped_ped %>% 
+                    inner_join(genome %>% 
+                                    rename(Accession=IID2,Female_Parent=IID1))) %>% 
+     # Declare confirm-reject Accession-Female_Parent
+     mutate(ConfirmFemaleParent=case_when(Z0<0.32 & Z1>0.67~"Confirm", 
+                                          # Relatedness coeff differ if the Accession is the result of a self-cross
+                                          Male_Parent==Female_Parent & PI_HAT>0.6 & Z0<0.3 & Z2>0.32~"Confirm",
+                                          TRUE~"Reject")) %>% 
+     dplyr::select(Accession,Female_Parent,ConfirmFemaleParent)
+#> Joining, by = c("Accession", "Female_Parent")
+#> Joining, by = c("Accession", "Female_Parent")
+## Now do the same for the Accession-Male_Parent relationships
+conf_male_ped<-genotyped_ped %>% 
+     inner_join(genome %>% 
+                     rename(Accession=IID1,Male_Parent=IID2)) %>% 
+     bind_rows(genotyped_ped %>% 
+                    inner_join(genome %>% 
+                                    rename(Accession=IID2,Male_Parent=IID1))) %>% 
+     # Declare confirm-reject Accession-Female_Parent
+     mutate(ConfirmMaleParent=case_when(Z0<0.32 & Z1>0.67~"Confirm", 
+                                          # Relatedness coeff differ if the Accession is the result of a self-cross
+                                          Male_Parent==Female_Parent & PI_HAT>0.6 & Z0<0.3 & Z2>0.32~"Confirm",
+                                          TRUE~"Reject")) %>% 
+     dplyr::select(Accession,Male_Parent,ConfirmMaleParent)
+#> Joining, by = c("Accession", "Male_Parent")
+#> Joining, by = c("Accession", "Male_Parent")
+# Now join the confirmed female and male relationships
+# This regenerates the original "genotyped_ped" with two added columns
+conf_male_ped<-genotyped_ped %>% 
+     inner_join(genome %>% 
+                     rename(Accession=IID1,Male_Parent=IID2)) %>% 
+     bind_rows(genotyped_ped %>% 
+                    inner_join(genome %>% 
+                                    rename(Accession=IID2,Male_Parent=IID1))) %>% 
+     # Declare confirm-reject Accession-Female_Parent
+     mutate(ConfirmMaleParent=case_when(Z0<0.32 & Z1>0.67~"Confirm", 
+                                          # Relatedness coeff differ if the Accession is the result of a self-cross
+                                          Male_Parent==Female_Parent & PI_HAT>0.6 & Z0<0.3 & Z2>0.32~"Confirm",
+                                          TRUE~"Reject")) %>% 
+     dplyr::select(Accession,Male_Parent,ConfirmMaleParent)
+#> Joining, by = c("Accession", "Male_Parent")
+#> Joining, by = c("Accession", "Male_Parent")
+# Now join the confirmed female and male relationships
+# This regenerates the original "genotyped_ped" with two added columns
+confirmed_ped<-conf_female_ped %>% 
+     left_join(conf_male_ped) %>% 
+     relocate(Male_Parent,.before = "ConfirmFemaleParent")
+#> Joining, by = "Accession"
+```
+
+```{r}
+#how well supported are the pedigree relationships according to my approach?
+confirmed_ped %>% 
+     count(ConfirmFemaleParent,ConfirmMaleParent) %>% 
+  mutate(Prop=round(n/sum(n),2))
+#  A tibble: 4 × 4
+#  ConfirmFemaleParent ConfirmMaleParent     n  Prop
+#  <chr>               <chr>             <int> <dbl>
+#1 Confirm             Confirm            4503  0.69
+#2 Confirm             Reject              888  0.14
+#3 Reject              Confirm             577  0.09
+#4 Reject              Reject              544  0.08    
+```
+Subset to fully-validated trios
+We can only run the cross-validation using a pedigree where the full trio (Accession?s relationship to both parents) is validated.
+Remove any without both parents confirmed.
+```{r}
+valid_ped<-confirmed_ped %>% 
+     filter(ConfirmFemaleParent=="Confirm",
+         ConfirmMaleParent=="Confirm") %>% 
+     dplyr::select(-contains("Confirm"))
+valid_ped %>% nrow()# 4503
+
+valid_ped %>% 
+    count(Female_Parent,Male_Parent) %>% 
+    filter(n>1)
+# 565 × 3; 565 full-sib families that have >1 entry are confirmed.
+
+valid_ped %>% 
+    count(Female_Parent,Male_Parent) %>% 
+    filter(n>2)
+# 437 × 3; 437 families have more than 2 entry
+saveRDS(valid_ped,here::here("output","verified_ped.rds"))
+```
+Parent-wise cross-validation
+Refer to:
+genomicMateSelectR::runParentWiseCrossVal() documentation
+Example of IITA_2021GS Cross-validationParent-wise cross-validation
+```{r}
+ped<-readRDS(here::here("output","verified_ped.rds")) %>% 
+     # Rename things to match genomicMateSelectR::runParentWiseCrossVal()
+     rename(GID=Accession,
+            sireID=Male_Parent,
+            damID=Female_Parent)
+# Keep only families with _at least_ 2 offspring
+ped %<>% 
+     semi_join(ped %>% count(sireID,damID) %>% filter(n>1) %>% ungroup())
+
+# GENOMIC RELATIONSHIP MATRIX
+grms<-list(A=readRDS(file=here::here("output","kinship_add.rds")))
+
+# BLUPs
+blups<-readRDS(here::here("output","blups.rds")) %>%
+     # need to rename the "blups" list to comply with the runCrossVal function
+     rename(TrainingData=BLUPs) %>% 
+     dplyr::select(Trait,TrainingData) %>% 
+     # need also to remove phenotyped-but-not-genotyped lines
+     mutate(TrainingData=map(TrainingData,
+                             ~filter(.,GermplasmName %in% rownames(grms$A)) %>% 
+                                  # rename the germplasmName column to GID
+                                  rename(GID=GermplasmName))) %>% 
+     # It seems actually that runParentWiseCrossVal() wants this column named "blups"
+     rename(blups=TrainingData)
+
+# DOSAGE MATRIX
+## Dosages are also needed inside the runParentWiseCrossVal() function
+## Reason is that they are used to extra SNP effects from GBLUP models
+dosages<-readRDS(here::here("data","dosages.rds"))
+
+# HAPLOTYPE MATRIX
+## keep only haplos for parents-in-the-pedigree
+## those which will be used in prediction, saves memory
+haploMat<-readRDS(file=here::here("data","haplotypes.rds"))
+parents<-union(ped$sireID,ped$damID) 
+parenthaps<-sort(c(paste0(parents,"_HapA"),
+                   paste0(parents,"_HapB")))
+haploMat<-haploMat[parenthaps,]
+
+# SELECTION INDEX
+SIwts<-c(PlantHeight=1,
+         FirstBranchHeight=10,
+         BranchlevelNum=-3,
+         PlantArchitecture=6)
+```
+
+```{r}
+# RECOMBINATION FREQUENCY MATRIX
+recombFreqMat<-readRDS(file=here::here("output","recombFreqMat_1minus2c.rds"))
+```
+#Run cross-validation
+```{r}
+#Too long time
+starttime<-proc.time()[3]
+parentWiseCV<-runParentWiseCrossVal(nrepeats=2,nfolds=5,seed=9999999999,
+                                    modelType="A",
+                                    ncores=10,
+                                    ped=ped,
+                                    blups=blups,
+                                    dosages=dosages,
+                                    haploMat=haploMat,
+                                    grms=grms,
+                                    recombFreqMat = recombFreqMat,
+                                    selInd = TRUE, SIwts = SIwts)
+elapsed<-proc.time()[3]-starttime; elapsed/60
+```
+```{r}
+
+```
+
+
+
+
+
+RR-BLUP aka SNP-BLUP
+```{r}
+M<-readRDS(file=here::here("data","dosages.rds"))
+# re-load and extract the blups for just 1 trait
+blups<-readRDS(file=here::here("output","blups.rds"))
+dm_blups<-blups$BLUPs[[1]]
+# remove phenotyped-but-not-genoypted blups
+dm_blups %<>% 
+     filter(GermplasmName %in% rownames(M))
+# remove genotyped-but-not-phenoypted (not strictly necessary)
+M<-M[rownames(M) %in% dm_blups$GermplasmName,]
+# Create a kinship matrix "K"
+K<-kinship(M,"add")
+# Now create a centered dosage matrix, to use as predictors for rr-BLUP
+Z<-centerDosage(M)
+
+#Fit the GBLUP model
+gblup<-mmer(fixed = drgBLUP~1,
+            random = ~vs(GermplasmName,Gu = K),
+            weights = WT,
+            data=dm_blups)
+#Now fit the RRBLUP model
+# one catch
+# the rows of the centered dosage matrix must be matched
+## to the rows of data.frame with the blups
+## one way to do this is by creating and incidence matrix
+## use the model.matrix() function as follows:
+ZincMat=model.matrix(~factor(GermplasmName,levels=rownames(Z))-1,data=dm_blups) # -1 because we don't want an intercept here
+dim(ZincMat)# [1] 3114 3114
+#now fit the RRBLUP model
+rrblup<-mmer(fixed = drgBLUP~1,
+             random = ~vsr(list(ZincMat%*%Z),buildGu = FALSE),
+             weights = WT,
+             data=dm_blups)
+```
+

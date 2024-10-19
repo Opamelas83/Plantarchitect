@@ -1,0 +1,127 @@
+---
+title: "generalanalysis"
+author: "Opamelas83"
+date: "2023-04-25"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## Analysis directly related to the manuscrit
+
+```{r}
+library(tidyverse); library(data.table); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm); library(gt); library(reactablefmtr); library(corrplot); library(factoextra); library(FactoMineR)
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
+#length(unique(MyArchiphenos_final$germplasmName)) 9062
+#length(unique(MyArchiphenos_final$studyName)) 274
+##Summary table for Archipheno trait
+MyArchiphenos_finalW <- MyArchiphenos_final %>% filter(!ArchiTRait %in% c("DMC", "FRWT", "FTWT")) %>% dplyr::select(programName, Year, ArchiTRait, Location, studyDesign, studyName, germplasmName) %>% rename(`Breeding program` = programName, Trait = ArchiTRait, `Trial design` = studyDesign)
+#length(unique(MyArchiphenos_finalW$germplasmName))[1] 7725 #Different from the previous because of plant shape trait
+#length(unique(MyArchiphenos_finalW$studyName))[1] 239
+#length(unique(MyArchiphenos_finalW$Location)) 27
+MySummaryData  <- MyArchiphenos_finalW %>% group_by(Trait, `Breeding program`, `Trial design`) %>% summarise(Year= length(unique(Year)), Location = length(unique(Location)), `nb Trials` = length(unique(studyName)), `nb clones` = length(unique(germplasmName)))
+write_csv(MySummaryData , "Result/MySummaryData.csv", append = FALSE)
+##Summary table for Shape trait
+Shapephenos_filtered <- read_csv("data/Shapephenos_filtered.csv", col_names = TRUE) 
+#length(unique(Shapephenos_filtered$studyName)) 18
+#length(unique(Shapephenos_filtered$germplasmName)) 1932
+#length(unique(Shapephenos_filtered$Location))6
+#28 locations = Shapephenos_filteredLocation U Shapephenos_filtered$Location
+#A$germplasmName <- Shapephenos_filtered$germplasmName
+#B$germplasmName <- MyArchiphenos_finalW$germplasmName
+#AB <- c(A,B) length(unique(AB)) 9214
+Shapephenos_filteredS <- Shapephenos_filtered %>% dplyr::select(programName, Year, Location, studyDesign, studyName, germplasmName) %>% rename(`Breeding program` = programName, `Trial design` = studyDesign)
+MySummaryShapeDataS  <- Shapephenos_filteredS %>% group_by(`Breeding program`, `Trial design`) %>% summarise(Year= length(unique(Year)), Location = length(unique(Location)), `nb Trials` = length(unique(studyName)), `nb clones` = length(unique(germplasmName)))
+write_csv(MySummaryShapeDataS , "Result/MySummaryShapeDataS.csv", append = FALSE)
+## second method for trial only
+MyArchiphenos_final <- MyArchiphenos_final %>% filter(!ArchiTRait %in% c("DMC", "FRWT", "FTWT")) %>% dplyr::select(programName, Year, ArchiTRait, Location, studyDesign, studyName) %>% unique() -> SummaryData1 #N_unique_accession,
+SummaryData <- table(SummaryData1$ArchiTRait, SummaryData1$programName, SummaryData1$studyDesign, SummaryData1$Location, SummaryData1$Year) %>% as.data.frame()#SummaryData1$N_unique_accession
+colnames(SummaryData) <- c("Trait", "Breeding program", "Trial design", "Location", "Year", "nb Trials")#"nb clones"
+SummaryData <- SummaryData[SummaryData$`nb Trials`!=0,]
+MySummaryData <- SummaryData %>% group_by(Trait,`Breeding program`, `Trial design`) %>% summarise(Year= length(unique(Year)), Location = length(unique(Location)), `nb Trials` = sum(`nb Trials`, na.rm = T))#`nb clones`=sum(`nb clones`, na.rm = T)
+```
+# Population structure
+```{r}
+dosages <- readRDS("data/dosages.rds")
+Mydosages <- as_tibble(dosages, rownames = NA)
+Mydosages <- rownames_to_column(Mydosages) %>% rename(germplasmName = rowname)
+#To get the breeding program name for all the genotypes, I downloaded a phenotype file including all the trials. 
+Access <- read_csv("data/Access_IITA_NRCRI.csv") #genotypes from NRCRI and IITA
+AccessN <- Access %>% dplyr::select(-plotNumber, -blockNumber)
+write_csv(AccessN, "data/Access_IITA_NRCRI_new.csv", append = FALSE)
+AccessN <- read_csv("data/Access_IITA_NRCRI_new.csv")
+Access1 <- AccessN %>% group_by(germplasmName, programName) %>%
+  summarise(germplasmName = unique(germplasmName))
+Access1 <- Access1 %>% mutate(NprogamName = length(unique(programName)))
+Access1 <- Access1 %>% mutate(programName = ifelse(NprogamName == 1, programName, "IITA and NRCRI"))
+Access2 <- Access1 %>% distinct() %>% dplyr::select(-NprogamName)
+Mydosages_Pro <- inner_join(Mydosages, Access2)
+#I will save my new dosage matrix by keeping only the genotypes from with program name.
+#For pca
+Mydosages_Prog <- Mydosages_Pro %>% dplyr::select(-programName)
+Mydosages_Pca <- column_to_rownames(as.data.frame(Mydosages_Prog), var = "germplasmName")
+Mypca <- prcomp(Mydosages_Pca, scale = FALSE) #[FactoMineR package]
+saveRDS(Mypca, file=here::here("output","wholepca_result.rds"))
+Mypca <- readRDS("output/wholepca_result.rds")
+#Mydosages_Pc < as.matrix(Mydosages_Pc)
+jpeg(filename = "output/PCA.jpeg")
+fviz_eig(Mypca) 
+dev.off()
+#Plot indiv from pca
+Mydosages_Pro$`Breeding Program` <- Mydosages_Pro$programName
+jpeg(filename = "output/PCA_indiv.jpeg")
+fviz_pca_ind(Mypca, 
+             geom = "point",
+             col.ind = Mydosages_Pro$`Breeding Program`,
+             palette = "Dark2",
+             legend.title = "Breeding Program")  +
+labs(x = "PC1 (6.8%)", y = "PC2 (2.8%)")
+dev.off()
+Mydosages
+#Germplas_program <- MyArchiphenos %>% dplyr::select(germplasmName, programName) 
+#Mypca <- prcomp(Mydosages) [FactoMineR; factoextra package] My
+# plot of SNP on the linkage group
+pca_result <- get_pca(Mypca, element = c("var", "ind"))
+saveRDS(pca_result, file=here::here("Result","pca_result.rds"))
+pca_result <- readRDS("Result/pca_result.rds")
+pca_var <- get_pca_var(Mypca)
+pca_var <- pca_var$contrib
+pca_var_dim <- as_tibble(pca_var, rownames = NA)
+pca_var_dim <- rownames_to_column(pca_var_dim) %>% rename(marker = rowname)
+pca_var_dim12 <- pca_var_dim %>% dplyr::select(marker, Dim.1, Dim.2)
+# from dosage matrix
+dosagecolnamelist <- colnames(Mydosages_Prog)
+dosagecolname <- as.data.frame(dosagecolnamelist) %>% slice(-1) %>% rename(marker = dosagecolnamelist)
+dosagecolname <- as_tibble(dosagecolname)
+dosagemarker <- dosagecolname %>% separate(marker, c("chromosome", "position", "v1", "v2"), sep = "_", remove = FALSE) %>% dplyr::select(-v1, -v2) %>% mutate(position = as.numeric(position)) %>% mutate(position = round(position/100000, digits=1))
+Dosage_pca <- left_join(pca_var_dim12, dosagemarker)
+write_csv(Dosage_pca , "output/Dosage_pca.csv", append = FALSE)
+Dosage_pca <- read_csv("output/Dosage_pca.csv")
+Dosage_pca <- Dosage_pca %>% 
+  mutate(PC1 = Dim.1 , PC2 = Dim.2, position = position/10, .keep = "unused") #to make position/1000000
+CompFIG1 <- ggplot(Dosage_pca, aes(x = position, y = `PC1`)) +
+  geom_point(color = Dosage_pca$chromosome) + 
+  #ylab("") +
+  #xlab("") +
+  #ggtitle("") + 
+ # guides(fill=guide_legend(title="")) + 
+  facet_wrap(~chromosome, ncol = length(unique(Dosage_pca$chromosome))) +
+  #theme_minimal() +
+  scale_color_brewer(palette= "Dark2")
+CompFIG2 <- ggplot(Dosage_pca, aes(x = position, y = `PC2`)) +
+  geom_point(color = Dosage_pca$chromosome) + 
+  facet_wrap(~chromosome, ncol = length(unique(Dosage_pca$chromosome))) +
+  scale_color_brewer(palette= "Dark2")
+#library (ggpubr)
+Figure <- ggarrange(CompFIG1, CompFIG2, ncol = 1, nrow = 2)
+#For GWAS analysis
+pca_ind <- get_pca_ind(Mypca)
+saveRDS(pca_ind, file=here::here("Result","pca_ind.rds"))
+pca_ind <- pca_ind$contrib
+pca_ind_dim <- as_tibble(pca_ind, rownames = NA)
+pca_ind_dim <- rownames_to_column(pca_ind_dim) %>% rename(germplasmName = rowname)
+pca_ind_dim12 <- pca_ind_dim %>% dplyr::select(germplasmName, Dim.1, Dim.2)
+write_csv(pca_ind_dim12, "/home/mo367/Desktop/Plantarchitect/Result/pca_ind_dim12.csv", append = FALSE)
+```
+
+

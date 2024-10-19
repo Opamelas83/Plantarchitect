@@ -1,0 +1,160 @@
+---
+title: "data_building"
+author: "Opamelas83"
+date: "2023-02-23"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+## Introduction
+## 1. Download phenotypic traits from Cassavabase following these steps
+  a. I downloaded all traits with the words "branch"/"flower"/"stem/"/"fork"/"node"/"canopy"/"leaf area/"plant height" to make a list of my plant architecture trait called "Architect_trait. .  
+  b. Select the following `Trial Types` according to Luciano:
+      - *Clonal Evaluation*;
+      - *Preliminary Yield Trial*;
+      - *Advanced Yield Trial*;
+      - *Uniform Yield Trial*;
+      - *Regional Trials*;
+      - *phenotyping_trial*.
+   c. Select `Years` from 2010 to 2022.
+   d. Select all the `trials` available at cassavabase after the filter, download the phenotypic data as "Architect_trait.csv"
+   
+## 2. Phenotypic data Information: The objective is Find a way to choose the traits we will consider for genomic selection. Chek the list of the traits,the number of trials in which the traits were measured. It can be evaluated by programm 
+### Table 1: List of traits and their number of trials par Program and Year
+```{r}
+library(tidyverse); library(data.table); library(reshape2);  library(reactable); library(here)
+ArchiData_pheno <- read.csv(file = here::here("data", "Architect_pheno.csv"), header = T, na.strings = "")
+ArchiData_pheno <- ArchiData_pheno %>% mutate(PHar = plant.stands.harvested.counting.CO_334.0000010)
+  #YieldData_pheno <- read.csv(file = here::here("data", "phenotype_yield.csv"), header = T, na.strings = "", skip = 2)
+#YieldData_pheno <- YieldData_pheno %>% mutate(blockNumbe = as.character(blockNumber))
+#ArchiData_pheno <- left_join(ArchiData_pheno, YieldData_pheno) %>% 
+  #mutate(PHar = plant.stands.harvested.counting.CO_334.0000010)
+#         PlantsPerPlot = max(PHar, na.rm = TRUE),
+ #        PropPHar = PHar / PlantsPerPlot, .keep = "unused")
+#There are trials from CIAT and Emprapa, also thera are  
+#ArchiData_pheno <- ArchiData_pheno %>%
+#  filter(!(programName == "CIAT" | programName == "Embrapa" | programName == "CIAT")) %>%
+# filter(!(programName == "CIAT" | programName == "Embrapa" | programName == "CIAT")) 
+ArchiData_meta <- read.csv(file = here::here("data", "Archimetadata.csv"), header = T, na.strings = "")
+ArchiData_meta <- ArchiData_meta %>% dplyr::select(studyName, studyDescription,
+studyYear, studyDesign, locationDbId, locationName, trialType,
+plantingDate, harvestDate, plotWidth, plotLength, fieldSize,
+fieldTrialIsPlannedToBeGenotyped, fieldTrialIsPlannedToCross)
+ArchiData  <- left_join(ArchiData_pheno,ArchiData_meta)
+
+AchiData1 <- ArchiData %>% reshape2::melt(data = .,
+                                id.vars = c("studyYear", "programDbId", "programName", "programDescription",
+                                                            "studyDbId", "studyName", "trialType", "studyDesign", "plotWidth",
+                                                            "plotLength", "fieldSize", "fieldTrialIsPlannedToBeGenotyped",
+                                                            "fieldTrialIsPlannedToCross", "plantingDate", "harvestDate",
+                                                            "locationDbId", "locationName", "germplasmDbId", "germplasmName",
+                                                            "germplasmSynonyms", "observationLevel", "observationUnitDbId",
+                                                            "observationUnitName", "replicate", "blockNumber", "plotNumber",
+                                                            "rowNumber", "colNumber", "entryType", "plantNumber"),
+                                                variable.name = "Trait",
+                                                value.name = "Value") 
+AchiData2 <- AchiData1[!is.na(AchiData1$Value),]
+saveRDS(object = AchiData2, file = here::here("output", "ArchiPAGP.RDS"))## Why to save like that? Why not csv? let's continue to see. 
+ArchiDatap <- readRDS(here("output","ArchiPAGP.RDS"))
+ArchiData3 <- ArchiDatap %>% dplyr::select(programName, studyYear, Trait, studyName) %>% unique()
+
+Table1 <- table(ArchiData3$programName, ArchiData3$studyYear, ArchiData3$Trait) %>% as.data.frame()
+colnames(Table1) <- c("programName", "Year", "Trait", "nb_Trials")
+Table1 <- Table1[Table1$`nb_Trials`!=0,] %>% 
+  filter(Trait %in% str_subset(Trait, "CO"))
+Table1 %>% reactable(groupBy = c("Trait", "programName"), columns = list(
+  "nb_Trials" = colDef(aggregate = "sum")), defaultPageSize = 15)
+#write_csv(Table1, "output/Trait_Table1.csv", append = FALSE)
+```
+## 3. This step is to filter the trait and keep those measured in more than 50 trials. I would filter up to 100 but some important traits related to flowering and stem have trials number under 100.
+### Table2: Table of trait with 50 trials or more 
+```{r}
+Table22 <- ArchiData3 %>% 
+  dplyr::select(Trait, studyName) %>%
+  filter(Trait %in% str_subset(Trait, "CO")) %>%
+  group_by(Trait) %>% 
+  summarise(nb_Trials=n())
+Table2 <- Table22 %>% filter(nb_Trials >= 30)
+write_csv(Table2, "output/Traitfiltrered_Table.csv", append = FALSE)
+```
+
+## 4. Making my data set with with the selected trait
+
+```{r}
+Mytraits <- Table2 %>% dplyr::select(Trait) %>% as.data.frame() 
+Mytraits <- transpose(Mytraits)
+names(Mytraits) <- as.character(unlist(Mytraits[1,]))
+MyArchidata <- ArchiData %>% 
+  dplyr::select(all_of(colnames(Mytraits)), studyYear, programName, studyName, trialType, studyDesign, plotWidth, plotLength, locationName, observationLevel, germplasmName,replicate, blockNumber, plotNumber, entryType, plantNumber, PHar) %>% 
+  mutate(BranchlevelNum = branching.level.counting.CO_334.0000079,
+         FirstBranchHeight = first.apical.branch.height.measurement.in.cm.CO_334.0000106,
+         PlantArchitecture = plant.architecture.visual.rating.1.5.CO_334.0000099, 
+         PlantShape = plant.shape.visual.assessment.1.4.CO_334.0000264,
+         PlantHeight = plant.height.measurement.in.cm.CO_334.0000018,
+         DMC = dry.matter.content.percentage.CO_334.0000092,
+         FRWT = fresh.storage.root.weight.per.plot.CO_334.0000012,
+         FRWT = as.numeric(FRWT),
+         FTWT = fresh.shoot.weight.measurement.in.kg.per.plot.CO_334.0000016,
+         FTWT = as.numeric(FTWT),
+         CMD1S = cassava.mosaic.disease.severity.1.month.evaluation.CO_334.0000191,
+       CMD12S = cassava.mosaic.disease.severity.12.month.evaluation.CO_334.0000199,
+       CMD3S = cassava.mosaic.disease.severity.3.month.evaluation.CO_334.0000192, 
+       CMD6S = cassava.mosaic.disease.severity.6.month.evaluation.CO_334.0000194,
+       CMD9S = cassava.mosaic.disease.severity.9.month.evaluation.CO_334.0000193,
+         Location = locationName,
+         Year = studyYear,
+         trialType = case_when(trialType == "Uniform Yield Trial" ~ "UYT",
+                      trialType == "Clonal Evaluation" ~ "CET",
+                      trialType == "Advanced Yield Trial" ~ "AYT",
+                      trialType == "Preliminary Yield Trial" ~ "PYT"),
+         Periode = ifelse(Year <= 2015,
+                                  yes = "Before_2015",
+                                  no = "After_2015"),
+
+                     .keep = "unused") %>% 
+  filter(!(is.na(trialType))) %>% 
+  mutate(BranchlevelNum = as.numeric(BranchlevelNum),
+ #recode plante architecture variable to binary phenotypes, namely   "2" for erect vs  "1" for non_erect       
+ PlantArchitecture = ifelse(PlantArchitecture >= 3, 1, 0),
+ PlantHeight = round(as.numeric(PlantHeight), digits = 1),
+ FirstBranchHeight = round(as.numeric(FirstBranchHeight), digits = 1)) %>%
+##Uniformising data: I noticed that some data were recorded in m and some in cm so I'm converting all the measure in meter 
+  mutate(PlantHeight = ifelse(PlantHeight >= 10, PlantHeight/100, PlantHeight),
+         FirstBranchHeight = ifelse(FirstBranchHeight >= 10, FirstBranchHeight/100, FirstBranchHeight), 
+         PlantHeight = ifelse(PlantHeight > 3.0 | PlantHeight < 1.0, NA, PlantHeight), 
+         FirstBranchHeight = ifelse(FirstBranchHeight > 2.0, NA, FirstBranchHeight),
+         PlantArchitecture = ifelse(PlantArchitecture > 5.0, NA, PlantArchitecture),
+         BranchlevelNum = ifelse(BranchlevelNum > 5.0, NA, BranchlevelNum),
+ #plant shape should be spread in four traits given its binominal/non ordonnal type     
+        Cylindrical_type = ifelse(PlantShape == 4.0, yes = "Cylindrical", no = ifelse(!is.na(PlantShape), yes = "Non_Cylindrical", no = NA)),
+       Umbrella_type = ifelse(PlantShape == 3.0, yes = "Umbrella", no = ifelse(!is.na(PlantShape), yes = "Non_Umbrella", no = NA)), 
+       Open_type = ifelse(PlantShape == 2.0, yes = "Open", no = ifelse(!is.na(PlantShape), yes = "Non_Open", no = NA)),
+     Compact_type = ifelse(PlantShape == 1.0, yes = "Compact", no = ifelse(!is.na(PlantShape), yes = "Non_Compact", no = NA)),
+ # additionnal variable for plant shape by grouping in erect and non erect
+      Erectibility = ifelse(PlantShape >= 3.0, yes = "Erect", no = ifelse(!is.na(PlantShape), yes = "Non_Erect", no = NA)),
+        PlotArea = plotWidth * plotLength) 
+       #CMD1S = as.numeric(ifelse(CMD1S<1 | CMD1S>5,NA,CMD1S)),
+       #CMD12S = as.numeric(ifelse(CMD12S<1 | CMD12S>5,NA,CMD12S)),
+       #CMD3S = as.numeric(ifelse(CMD3S<1 | CMD3S>5,NA,CMD3S)), 
+      #CMD6S = as.numeric(ifelse(CMD6S<1 | CMD6S>5,NA,CMD6S)),
+      # CMD9S = as.numeric(ifelse(CMD9S<1 | CMD9S>5,NA,CMD9S)))
+MyArchidata<-MyArchidata %>% 
+ # mutate(MCMDS=rowMeans(.[,colnames(.) %in% c("CMD1S","CMD12S","CMD3S","CMD6S","CMD9S")], na.rm = T)) %>% 
+  dplyr::select(-any_of(c("CMD1S","CMD12S","CMD3S","CMD6S","CMD9S", "plant.stands.harvested.counting.CO_334.0000010", "PlantArchitecture")))
+         #FYLD = ifelse(!is.na(PlantsPerPlot), (FRWT/(PlantsPerPlot*PlotArea))*10, NA),
+        # FTLD = ifelse(!is.na(PlantsPerPlot), (FTWT/(PlantsPerPlot*PlotArea))*10, NA))# 
+MyArchidata$PlantHeight[MyArchidata$PlantHeight == 0] <- NA 
+MyArchidata$FirstBranchHeight[MyArchidata$FirstBranchHeight == 0] <- NA 
+#MyArchidata$PlantArchitecture[MyArchidata$PlantArchitecture == 0] <- NA 
+#Remove Plant architecture and disease from my data.
+
+MyArchidata <- MyArchidata %>% 
+  filter(! is.na(BranchlevelNum) | 
+            ! is.na(FirstBranchHeight) | 
+           ! is.na(PlantShape) | 
+           ! is.na(PlantHeight)) 
+write_csv(MyArchidata, "data/MyArchidata.csv", append = FALSE)
+```
+
+

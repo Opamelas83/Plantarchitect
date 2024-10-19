@@ -1,0 +1,42 @@
+  Tukey multiple comparisons of means
+    95% family-wise confidence level
+
+Fit: aov(formula = ArchiValue ~ trialType, data = MyArchiphenos_finalf_plantheight)
+
+$trialType
+                diff          lwr         upr     p adj
+CET-AYT  0.002802742 -0.023048125  0.02865361 0.9924584
+PYT-AYT  0.015942706 -0.008962927  0.04084834 0.3535323
+UYT-AYT -0.079709721 -0.107541726 -0.05187772 0.0000000
+PYT-CET  0.013139964 -0.009601769  0.03588170 0.4468992
+UYT-CET -0.082512463 -0.108426096 -0.05659883 0.0000000
+UYT-PYT -0.095652427 -0.120623202 -0.07068165 0.0000000
+
+  Tukey multiple comparisons of means
+    95% family-wise confidence level
+
+Fit: aov(formula = ArchiValue ~ trialType, data = MyArchiphenos_finalf_FirstBranchHeight)
+
+$trialType
+               diff         lwr          upr     p adj
+CET-AYT -0.04444499 -0.06914653 -0.019743461 0.0000226
+PYT-AYT -0.06704352 -0.09161621 -0.042470832 0.0000000
+UYT-AYT -0.11447405 -0.14253191 -0.086416184 0.0000000
+PYT-CET -0.02259853 -0.04272940 -0.002467649 0.0205061
+UYT-CET -0.07002905 -0.09429176 -0.045766348 0.0000000
+UYT-PYT -0.04743053 -0.07156205 -0.023299008 0.0000027
+
+  Tukey multiple comparisons of means
+    95% family-wise confidence level
+
+Fit: aov(formula = ArchiValue ~ trialType, data = MyArchiphenos_finalf_BranchlevelNum)
+
+$trialType
+               diff        lwr        upr     p adj
+CET-AYT -0.64079707 -0.7400457 -0.5415484 0.0000000
+PYT-AYT -0.35780734 -0.4495518 -0.2660629 0.0000000
+UYT-AYT  0.00832058 -0.1021726  0.1188137 0.9974344
+PYT-CET  0.28298973  0.2089365  0.3570430 0.0000000
+UYT-CET  0.64911764  0.5528079  0.7454274 0.0000000
+UYT-PYT  0.36612792  0.2775710  0.4546848 0.0000000
+
