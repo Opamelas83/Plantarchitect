@@ -9,8 +9,12 @@ editor_options:
 
 ## Introduction
 ```{r}
+install.packages("devtools"); library(devtools)
 install.packages("sommer") #new version is important
 library(tidyverse); library(data.table); library(genomicMateSelectR); library(magrittr); library(sommer); library(corrplot); library(qqman)
+install.packages("devtools")
+devtools::install_github("jiabowang/GAPIT3",force=TRUE)
+library(GAPIT)
 #library(snpsOfInterest)
 #str(snpsOfInterest) It is possible to color the important SNP= SNP of unterest.
 ```
@@ -57,9 +61,74 @@ dosagecolname <- as.data.frame(dosagecolnamelist) %>% slice(-1) %>% rename(Locus
 dosagemarker <- dosagecolname %>% separate(Locus, c("Chrom", "Position", "v1", "v2"), sep = "_", remove = FALSE) %>% dplyr::select(-v1, -v2) %>% mutate(Position = as.numeric(Position), Chrom = as.numeric(Chrom)) %>% mutate(Position = round(Position/100000, digits=1))
 
 ```
-#Fit GWAS from sommer package
+#GWAS with GAPIT
 ```{r}
-mix1 <- sommer::GWAS(BLUP~Dim.1,# it improved the Qqplot?
+#Phenotypic Data: make a table with the BLUP for all the traits
+blups<-readRDS(here::here("output","blups.rds"))
+blup1 <- blups[[2]][[1]] %>% rename(Taxa=GermplasmName) %>% mutate(BranchlevelNum=BLUP) %>% dplyr::select(Taxa,BranchlevelNum)#blups[[1]][[1]]
+blup2 <- blups[[2]][[2]] %>% rename(Taxa=GermplasmName) %>% mutate(FirstBranchHeight=BLUP) %>% dplyr::select(Taxa,FirstBranchHeight) %>% right_join(blup1)#blups[[1]][[2]]
+
+blup3 <- blups[[2]][[3]] %>% rename(Taxa=GermplasmName) %>% mutate(PlantHeight=BLUP) %>% dplyr::select(Taxa,PlantHeight) %>% right_join(blup2)#blups[[1]][[3]]
+
+blup4 <- blups[[2]][[4]] %>% rename(Taxa=GermplasmName) %>% mutate(Cylindrical=BLUP) %>% dplyr::select(Taxa,Cylindrical) %>% right_join(blup3)#blups[[1]][[4]]
+
+blup5 <- blups[[2]][[5]] %>% rename(Taxa=GermplasmName) %>% mutate(Umbrella=BLUP) %>% dplyr::select(Taxa,Umbrella) %>% right_join(blup4) #blups[[1]][[5]]
+  
+blup6 <- blups[[2]][[6]] %>% rename(Taxa=GermplasmName) %>% mutate(Open=BLUP) %>% dplyr::select(Taxa,Open) %>% right_join(blup5)#blups[[1]][[6]]
+  
+blupT <- blups[[2]][[7]] %>% rename(Taxa=GermplasmName) %>% mutate(Compact=BLUP) %>% dplyr::select(Taxa,Compact) %>% right_join(blup6)#blups[[1]][[7]]
+write.table(blupT, "data/MyArchiphenos_blup")              
+myY <- read.table("data/MyArchiphenos_blup", head = TRUE)
+
+#HapMap genotype format
+myG <- read.delim("data/VCF/BreedBaseGenotypes.hmp.txt", head = TRUE)
+#Numerical genotype format
+#--A pair of Genotypic Data and map files-
+#myGD <- read.table("mdp_numeric.txt", head = TRUE)
+#myGM <- read.table("mdp_SNP_information.txt", head = TRUE)
+#Kinship matrix
+myKI <- read.table("output/kinship_add.rds", head = TRUE)
+#remove non-phenotyped from A kinship
+#A<-readRDS(file=here::here("output","kinship_add.rds"))
+#gids<- unique(blup1$GID)
+#A1 <- A[gids,gids]
+#covaraite variables such as population structure
+myCV <- read.table("Result/pca_ind_dim12.csv", sep = ",", head = TRUE)
+# get the PCA
+pca_ind_dim12 <- read_csv("Result/pca_ind_dim12.csv")
+pca_ind_dim12M <- pca_ind_dim12 %>% mutate(GID = germplasmName) %>% dplyr::select(GID, Dim.1, Dim.2)
+blup1 <- left_join(blup1, pca_ind_dim12M)
+##RUN GWAS with GAPIT
+#Step 1: Set data directory and import files
+myY <- read.table("data/MyArchiphenos_blup", head = TRUE)
+myG <- read.table("data/VCF/BreedBaseGenotypes.hmp.txt")#,  
+#as.is=T, sep = "", head=T, strip.white = T, fill=T) #sep = "\t", quote = "\n", head = F,
+
+#Step 2: Run GAPIT
+myGAPIT <- GAPIT(
+Y=myY,
+G=myG,
+PCA.total=3,
+model= "MLM",
+SNP.MAF = 0.01)#,
+#nrep=100,
+#h2=0.9,
+#model =c("GLM","MLM","MLMM","FarmCPU","BLINK","SUPER"),
+#NQTN=20))
+## For genomic selection
+#myGAPIT <- GAPIT(
+#Y=myY,
+#G=myG,
+#PCA.total=3,
+#model= c("gBLUP"),
+#SNP.MAF = 0.01)
+#inf.pred=merge(myGAPIT$Pred[myGAPIT$Pred[,3]==2,c(1,3,5,8)],myY,by.x="Taxa",by.y="Taxa")
+#cor(inf.pred[,4],inf.pred[,5])
+```
+
+#Fit GWAS from sommer package (not used in here results) all following script were just for training
+```{r}
+mix1 <- sommer::GWAS(BLUP~Dim.1 + Dim.2,# it improved the Qqplot?
 random=~vsr(GID,Gu=A1),#Dim.2
 rcov=~vsr(units),
 data=blup1, nIters=15,
@@ -76,23 +145,26 @@ saveRDS(mix1, (here::here("output","GWAS_BranchlevelNumNEW.rds")))
 mix1 <- readRDS(here::here("output","GWAS_BranchlevelNum.rds"))
 ms <- as.data.frame(mix1$scores)
 ms$Locus <- rownames(ms)
-ms <- cbind(ms, ms_pval)
+#ms <- cbind(ms, ms_pval)
 MP2 <- merge(dosagemarker,ms,by="Locus",all.x = TRUE)
 MP2 <- MP2 %>% mutate(Chrom = as.numeric(Chrom),
                       Position = as.numeric(Position),
                       BLUP = ifelse(is.infinite(BLUP), 0, BLUP),
-                      `p.val` = (BLUP)) %>% rename(Reelpvalue = V1)
+                      `p.val` = (BLUP)) %>% rename(Reelpvalue = V1) %>%
+  dplyr::select(locus, Chrom, Position, `p.val`, Reelpvalue)
+
 write_csv(MP2, "Result/MP2_GWAS_BranchlevelNum.csv", append = FALSE)
-#MP2_GWAS_BranchlevelNum <- read_csv("Result/MP2_GWAS_BranchlevelNum.csv")
-#Determine number of QTLS BY trait by chrom
-#QTL_GWAS_PlantHeight <- MP2 %>% filter(MP2$BLUP > 5.35) =0
-#QTL_GWAS_FirstBranchHeight <- MP2 %>% filter(MP2$BLUP > 5.35) =0
-QTL_GWAS_BranchlevelNum <- MP2 %>% filter(MP2$BLUP > 5.35) %>% mutate(Reelpvalue = round(Reelpvalue, digit = 2))
-write_csv(QTL_GWAS_BranchlevelNum, "Result/QTL_GWAS_BranchlevelNum.csv", append = FALSE)
-plotTittle = (paste0("Manhattan Plot ",blups[[1]][[3]]))
+MP2_GWAS_BranchlevelNum <- read_csv("Result/MP2_GWAS_BranchlevelNum.csv")
+##Determine number of QTLS BY trait by chrom
+#QTL_GWAS_PlantHeight <- MP2 %>% filter(MP2$`p.val` > (-log10(1e-5))) =0
+#QTL_GWAS_FirstBranchHeight <- MP2 %>% filter(MP2$`p.val` > (-log10(1e-5))) =0
+#QTL_GWAS_BranchlevelNum <- MP2_GWAS_BranchlevelNum %>% filter(MP2_GWAS_BranchlevelNum$`p.val` > (-log10(1e-5)))
+#write_csv(QTL_GWAS_BranchlevelNum, "Result/QTL_GWAS_BranchlevelNum.csv", append = FALSE)
+plotTittle = (paste0("Manhattan Plot ",blups[[1]][[1]]))
 #sommer::manhattan(MP2, pch=20, cex=.5, col = c("orange3", "grey40"), main = plotTittle, fdr.level=0.01)#sommer manhattan different from qqman
 #MP2 <- MP2 %>% rename(BP = Position, CHR = Chrom, P = `p.val`) %>% dplyr::select(Locus, BP, CHR, P) %>% mutate(BP = as.numeric(BP), CHR = as.numeric(CHR), P = as.numeric(P))
-qqman::manhattan(MP2, chr = "Chrom", bp = "Position", p = "p.val", snp = "Locus", ylim = c(0,4),  logp = F, genomewideline = FALSE, cex = 0.6, cex.axis = 0.9, col = c("orange3", "grey40"), main = plotTittle)# FRD(0.05) = 4.35. 5.35 is the value got from automatically from sommer::manhanttan. logp = FALSE, because I'm using the scores values from sommer out put that I think is the -log(P.value). I get the same result.
+
+qqman::manhattan(MP2_GWAS_BranchlevelNum, chr = "Chrom", bp = "Position", p = "p.val", snp = "Locus", logp = F, cex = 0.6, cex.axis = 0.9, col = c("orange3", "grey40"), main = plotTittle)# ylim = c(0,4),FRD(0.05) = 4.35. 5.35 is the value got from automatically from sommer::manhanttan. logp = FALSE, because I'm using the scores values from sommer out put that I think is the -log10(P.value). I get the same result.
 MS <- as.data.frame(mix1$pvals)
 MS$`P.val` <- MS$V1
 qq(MS$`P.val`)
@@ -101,12 +173,34 @@ qq(MS$`P.val`)
 ```
 
 ```{r}
-#Packages folder
- "/Library/Frameworks/R.framework/Versions/4.3-x86_64/Resources/library/GENESIS" 
+#Conduct a GWAS using only the SNPs associated with QTLs, focusing on calculating the proportion of variance explained (PVE) by each SNP. This approach aims to identify the most relevant loci for selecting candidate genes
+A1 <- A[gids,gids]
+dosages1 <- dosages[gids,]
+#select SNP of QTLS
+BranchlevelNum_QTL <- QTL_GWAS_BranchlevelNum$Locus 
+dosages1_BranchlevelNum_QTL <- subset(dosages1, TRUE, BranchlevelNum_QTL)
+#Fit GWAS
+mix1_BranchlevelNum_QTL <- sommer::GWAS(BLUP~Dim.1 + Dim.1,
+random=~vsr(GID,Gu=A1),#Dim.2
+rcov=~vsr(units),
+data=blup1, nIters=15,
+M=dosages1_BranchlevelNum_QTL, gTerm = "u:GID",
+verbose = FALSE,
+P3D = FALSE)
+saveRDS(mix1_BranchlevelNum_QTL, (here::here("output","GWAS_BranchlevelNum_QTL")))
+#Proportion of variance in phenotype explained by a given SNP (PVE) = [2*(beta^2)*MAF*(1-MAF)]/[2*(beta^2)*MAF(1-MAF)+((se(beta))^2)*2*N*MAF*(1-MAF)]
+where:
+#N - sample size
+#se(beta) - standard error of effect size for the genetic variant of interest
+#beta - effect size for the genetic variant of interest
+#MAF - minor allele frequency for the genetic variant of interest
+#it is described in:
+#Shim, H., Chasman, D.I., Smith, J.D., Mora, S., Ridker, P.M., Nickerson, D.A., Krauss, R.M., and Stephens, M. (2015). A multivariate genome-wide association analysis of 10 LDL subfractions, and their response to statin treatment, in 1868 Caucasians. PLoS One 10, e0120758.
+
 ```
 
 ```{r}
-#Test population structure: estimate genomic inflation factor
+#Test population structure: estimate genomic inflation factor as lambda gc (λgc)
 #library(QQperm)
 MP2 <- MP2 %>% mutate(Chrom = as.numeric(Chrom),
                       Position = as.numeric(Position),
@@ -122,6 +216,8 @@ median(na.omit(chisq))/qchisq(0.5,1)
 
 #GWAS with Bioconductor (GENESIS AND GWASTOOLS)
 ```{r}
+#Packages folder
+ "/Library/Frameworks/R.framework/Versions/4.3-x86_64/Resources/library/GENESIS"
 library(GENESIS); library(GWASTools)
 #Read genotype data
 dosages<-readRDS(file=here::here("data","dosages.rds"))
@@ -250,7 +346,7 @@ qq(GWAS_Compact_type$Score.pval)
 #sommer::manhattan(GWAS_Compact_typeB, pch=20, cex=.5, col = c("orange3", "grey40"), main = plotTittle, fdr.level=0.001)#sommer manhattan different from qqman
 #Heritability Estimation
 varCompCI(nullmod, prop = TRUE)
-H= A-
+
 ```
 
 
@@ -289,8 +385,9 @@ Transfodosages2_dosage <- column_to_rownames(as.data.frame(Transfodosages2_dosag
 Transfodosages2_dosage <- as.matrix(Transfodosages2_dosage)
 ```
 
-plink training
 
+
+plink training
 ```{r}
 #My alternate phenotype file
 Shapephenos_filtered <- read_csv("data/Shapephenos_filtered.csv", col_names = TRUE)

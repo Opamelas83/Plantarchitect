@@ -279,7 +279,26 @@ MyArchiphenos_final <- bind_rows(MyArchiphenos_replicated_filtered_outl, MyArchi
 write.table(MyArchiphenos_final, file = "data/MyArchiphenos_final.csv", quote = TRUE, sep =",", append = FALSE, row.names = F)
 ```
 
-####Run the model for Plant architecture replicated trials
+#Data distribution visualization with replicated and filtered trials trials and outliers removed
+```{r}
+MyArchiphenos_replicated_filtered <-  read_csv("data/MyArchiphenos_replicated_filtered.csv", col_names = TRUE)
+#Architraits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture")
+MyArchiphenos_replicated_filtered_outl <-  read_table("data/MyArchiphenos_replicated_filtered_outl.csv")
+MyArchiphenos_replicated_filtered_outl$trialType <- factor(MyArchiphenos_replicated_filtered_outl$trialType, 
+                                     levels = c("CET", "PYT", "AYT", "UYT")) # Reordering group factor levels
+MyArchiphenos_replicated_filtered_outl$ArchiTRait <- factor(MyArchiphenos_replicated_filtered_outl$ArchiTRait,      
+                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum", "PlantArchitecture"))
+MyArchiphenos_replicated_filtered_outl <- MyArchiphenos_replicated_filtered_outl %>% filter(!ArchiTRait == "PlantArchitecture")
+ggplot(data = MyArchiphenos_replicated_filtered_outl,
+                             aes(x=trialType,y=ArchiValue, fill = ArchiTRait)) +
+  geom_boxplot(stat = "boxplot") +
+  stat_summary(fun=mean, na.rm = TRUE) +
+  labs(x= "Tria type", y= "Values") + theme_bw() +
+    facet_grid(ArchiTRait~trialType, scales = "free")
+```
+
+## Run the model for each trait separately
+####Run the model for Plant architecture trait replicated trials
 ```{r}
 MyArchiphenos <- read_csv("data/MyArchiphenotypes.csv", col_names = TRUE)
 MyArchiphenos_replicated_Ar <- unique(MyArchiphenos$ArchiTRait) %>% filter(Replicated == TRUE) %>% filter(ArchiTRait == "PlantArchitecture") %>% mutate(ArchiValue = as.factor(ArchiValue))
@@ -328,7 +347,7 @@ results_Archi
 write.table(results_Archi, file = "Result/MixedModels_Archi.csv", quote = T, sep =",", append = FALSE, row.names = F)
 
 ```
-## Run the model for each trait separately
+
 #PlantArchitecture replicated trials
 ```{r}
 MyArchiphenos <- read_csv("data/MyArchiphenotypes.csv", col_names = TRUE)
@@ -539,11 +558,12 @@ for(j in ArchiTRials){
 results_PlantHeight
 # Error : number of levels of each grouping factor must be < number of observations (problems: germplasmName) is because all the accessions have only one observation per block ("21_YellowFreshAyt31_Namulonge"). boundary (singular) fit: see help('isSingular') is for the very low genetic variation ("19C2bCETnonGSumu"). Ex #"14.GS.C1.EC.329.MK", 
 ```
-#Data distribution visualization with replicated anf filtered trials trials and outliers removed
-```{r}
-MyArchiphenos_replicated_filtered <-  read.csv("data/MyArchiphenos_replicated_filtered.csv")
-#Architraits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture")
 
+#Data distribution visualization with replicated and filtered trials trials and outliers removed
+```{r}
+MyArchiphenos_replicated_filtered <-  read_csv("data/MyArchiphenos_replicated_filtered.csv", col_names = TRUE)
+#Architraits <- c("BranchlevelNum", "FirstBranchHeight", "PlantHeight", "PlantArchitecture")
+MyArchiphenos_replicated_filtered_outl <-  read_table("data/MyArchiphenos_replicated_filtered_outl.csv")
 MyArchiphenos_replicated_filtered_outl$trialType <- factor(MyArchiphenos_replicated_filtered_outl$trialType, 
                                      levels = c("CET", "PYT", "AYT", "UYT")) # Reordering group factor levels
 MyArchiphenos_replicated_filtered_outl$ArchiTRait <- factor(MyArchiphenos_replicated_filtered_outl$ArchiTRait,      

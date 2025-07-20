@@ -79,10 +79,10 @@ write.table(subset_unique_names_for_vcf,file = "data/subset_unique_names_for_vcf
 #Plantarchitect % bcftools query --list-samples data/VCF/BreedBaseGenotypesDownload_a.vcf
 #vcftools --vcf data/VCF/BreedBaseGenotypesDownload_a.vcf --keep data/subset_unique_names_for_vcf.txt --recode --stdout | bgzip -c > data/VCF/BreedBaseGenotypes_subset_a.vcf.gz
 ####more
-mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --vcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
-mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --vcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
-mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --vcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recodemo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --gzvcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
-mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --gzvcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
+#mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --vcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
+#mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --vcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
+#mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --vcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recodemo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --gzvcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
+#mo367@AG-PBG-92GML7L Plantarchitect_PLINK % vcftools --gzvcf BreedBaseGenotypes.vcf.gz --keep Myindiv.txt --recode --stdout | bgzip -c > BreedBaseGenotypesM.vcf.gz
 #mo367@AG-PBG-92GML7L Plantarchitect_PLINK % bcftools query -l BreedBaseGenotypesM.vcf.gz > vcf_colnames.txt  
 Myheader <- readLines("/Users/mo367/Desktop/Plantarchitect_PLINK/vcf_colnames.txt")
 Myheader1 <- tibble(Myheader)

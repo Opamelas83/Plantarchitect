@@ -10,7 +10,7 @@ editor_options:
 ## Introduction
 
 ```{r}
-library(tidyverse); library(data.table); library(lme4); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm); library(gt); library(corrplot); library(reactable); library(ggpubr); library(rstatix)
+library(tidyverse); library(data.table); library(lme4); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm); library(gt); library(corrplot); library(reactable); library(ggpubr); library(rstatix); library(purrr)#library(lemon);
 MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
 MyArchiphenos_final %>% dplyr::select(programName, Year, ArchiTRait, studyName) %>% unique() -> SummaryData1
 SummaryData2 <- table(SummaryData1$ArchiTRait, SummaryData1$programName, SummaryData1$Year) %>% as.data.frame()
@@ -28,26 +28,78 @@ SummaryData_present <- SummaryData2 %>%
 #reactablefmtr::save_reactable_test(SummaryData2, "SummaryData.png")
 ```
 
-#Data distribution visualization with replicated anf filtered trials trials and outliers removed
+#Data distribution visualization with replicated and non_replicated trials and outliers removed
 ```{r}
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
 MyArchiphenos_finalf <- MyArchiphenos_final %>% filter(ArchiTRait %in% c("PlantHeight", "FirstBranchHeight", "BranchlevelNum")) %>% rename(Trait = ArchiTRait) #"PlantArchitecture"
-MyArchiphenos_finalf$trialType <- factor(MyArchiphenos_finalf$trialType, 
-                                      levels = c("CET", "PYT", "AYT", "UYT"))
+# Mean Comparison of Breeding Programs for "PlantHeight", "FirstBranchHeight", and "BranchLevelNum Traits"
+## mean value by trait by group
+Meangroup <- MyArchiphenos_finalf %>% group_by(Trait, programName, trialType) %>%
+  get_summary_stats(ArchiValue, type = "mean_sd")
+write.csv(Meangroup , "Result/Meangroup.csv", append = FALSE)
+
+finalf_AOV <- MyArchiphenos_finalf %>% 
+  pivot_wider(names_from = Trait, values_from =ArchiValue) 
+##ANOVA
+PlantHeight_aov <- aov(PlantHeight ~ programName*trialType, data = finalf_AOV)
+PlantHeight_aov_sum <- data.frame(summary(PlantHeight_aov)[[1]])
+write.table(PlantHeight_aov_sum , "Result/PlantHeight_aov_sum.csv", append = FALSE, col.names = NA, row.names = TRUE)
+PlantHeight_aov_Tuk <- TukeyHSD(PlantHeight_aov)
+Table1 <- data.frame(PlantHeight_aov_Tuk$`programName:trialType`)
+#write.table(Table1 , "T1.csv", append = FALSE)
+FirstBranchHeight_aov <- aov(FirstBranchHeight ~ programName*trialType, data = finalf_AOV)
+FirstBranchHeight_aov_sum <- data.frame(summary(FirstBranchHeight_aov)[[1]])
+write.table(FirstBranchHeight_aov_sum , "Result/FirstBranchHeight_aov_sum.csv", append = FALSE)
+FirstBranchHeight_aov_Tuk <- TukeyHSD(FirstBranchHeight_aov)
+Table2 <- data.frame(FirstBranchHeight_aov_Tuk$`programName:trialType`)
+#write.table(Table2 , "T2.csv", append = FALSE)
+BranchlevelNum_aov <- aov(BranchlevelNum ~ trialType, data = finalf_AOV)
+BranchlevelNum_aov_sum <- data.frame(summary(BranchlevelNum_aov)[[1]])
+write.table(BranchlevelNum_aov_sum , "Result/BranchlevelNum_aov_sum.csv", append = FALSE)
+BranchlevelNum_aov_Tuk <- TukeyHSD(BranchlevelNum_aov)
+Table3 <- data.frame(BranchlevelNum_aov_Tuk$`trialType`)
+#write.table(Table3 , "T3.csv", append = FALSE)
+
+#General_AOV <- manova(cbind(PlantHeight, FirstBranchHeight) ~ programName*trialType, data = finalf_AOV) Not working properly because of the cbind.I need to fix  
+#summary.aov(General_AOV)
+
+MyArchiphenos_finalf_IITA <- MyArchiphenos_finalf %>% filter(programName %in% "IITA")
+MyArchiphenos_finalf_IITA$trialType <- factor(MyArchiphenos_finalf_IITA$trialType,                                     levels = c("CET", "PYT", "AYT", "UYT"))
 # Reordering group factor levels
-MyArchiphenos_finalf$Trait <- factor(MyArchiphenos_finalf$Trait,      
+MyArchiphenos_finalf_IITA$Trait <- factor(MyArchiphenos_finalf_IITA$Trait,      
                         levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum"))#"PlantArchitecture"
-jpeg(filename = "Traits distribution1.jpeg")
-AE <- ggplot(data = MyArchiphenos_finalf,
+#jpeg(filename = "Result/IITA_Traits_distribution.jpeg")
+ CompFIG1 <- ggplot(data = MyArchiphenos_finalf_IITA,
                              aes(x=trialType,y=ArchiValue, fill = Trait)) +
   geom_boxplot(stat = "boxplot") +
   stat_summary(fun=mean, na.rm = TRUE) +
   labs(x= "Tria type", y= "Values") + theme_bw() +
     facet_grid(Trait~trialType, scales = "free") +
-  geom_text(data = MyArchiphenos_finalf,
-            aes(label = ArchiValue, y = ArchiValue + 0.08)) +
-  theme(legend.position='none')
+   ggtitle("IITA")
+  #geom_text(data = MyArchiphenos_finalf,
+  #          aes(label = ArchiValue, y = ArchiValue + 0.08)) +
+  #theme(legend.position='none')
+#dev.off()
+
+MyArchiphenos_finalf_NRCRI <- MyArchiphenos_finalf %>% filter(programName %in% "NRCRI")
+
+  MyArchiphenos_finalf_NRCRI$trialType <- factor(MyArchiphenos_finalf_NRCRI$trialType,                                     levels = c("CET", "PYT", "AYT", "UYT"))
+# Reordering group factor levels
+MyArchiphenos_finalf_NRCRI$Trait <- factor(MyArchiphenos_finalf_NRCRI$Trait,      
+                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum"))#"PlantArchitecture"
+#jpeg(filename = "Result/NRCRI_Traits_distribution.jpeg")
+ CompFIG2 <- ggplot(data = MyArchiphenos_finalf_NRCRI,
+                             aes(x=trialType,y=ArchiValue, fill = Trait)) +
+  geom_boxplot(stat = "boxplot") +
+  stat_summary(fun=mean, na.rm = TRUE) +
+  labs(x= "Tria type", y= "Values") + theme_bw() +
+    facet_grid(Trait~trialType, scales = "free") +
+   ggtitle("NRCRI")
+ nt <- theme(legend.position='none')
+jpeg(filename = "Result/TraitDistribution.jpeg")
+grid_arrange_shared_legend(CompFIG1+nt, CompFIG2+nt, ncol = 2, nrow = 1)
 dev.off()
-# For each trait 
+ # For each trait 
 #MyArchiphenos_finalf_plantheight <- MyArchiphenos_finalf %>% filter(Trait == "PlantHeight")
 #Archivalue_plantheight <- #MyArchiphenos_finalf_plantheight$ArchiValue
 #MyArchiphenos_finalf_FirstBranchHeight <- MyArchiphenos_finalf %>% filter(Trait == "FirstBranchHeight")
@@ -56,14 +108,14 @@ dev.off()
 #Archivalue_BranchlevelNum <- MyArchiphenos_finalf_BranchlevelNum$ArchiValue
 
 # mean value by trait by group
-MyArchiphenos_finalf_BranchlevelNum %>%
-  group_by(trialType) %>%
-  get_summary_stats(ArchiValue, type = "mean_sd")
+#MyArchiphenos_finalf_BranchlevelNum %>%
+#  group_by(trialType) %>%
+#  get_summary_stats(ArchiValue, type = "mean_sd")
 # Anova to test the difference mean value
-res.aov <- aov(ArchiValue ~ trialType, data = MyArchiphenos_finalf_BranchlevelNum)
-summary(res.aov)
-TukeyHSD(res.aov)
-capture.output(TukeyHSD(res.aov), file="Result/MyArchiphenos_finalf_AOV.txt", append= TRUE)
+#res.aov <- aov(ArchiValue ~ trialType, data = MyArchiphenos_finalf_BranchlevelNum)
+#summary(res.aov)
+#TukeyHSD(res.aov)
+#capture.output(TukeyHSD(res.aov), file="Result/MyArchiphenos_finalf_AOV.txt", append= TRUE)
 
 # For "PlantArchitecture" distribution
 #MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
@@ -367,7 +419,7 @@ MML_drgblups <- General_results %>%
     spread(Trait,drgBLUP)
 #Correlation between trait using the drgBLUPs VALUE
 drgBLUP <- MML_drgblups %>% # dplyr::select(-GermplasmName) %>%
-  dplyr::select(BranchlevelNum, FirstBranchHeight, PlantHeight, Cylindrical, Umbrella, Open, Compact, DMC, FRWT, FTWT) #%>% na.omit()
+  dplyr::select(PlantHeight, FirstBranchHeight, BranchlevelNum, Cylindrical, Umbrella, Open, Compact, DMC, FRWT, FTWT) #%>% na.omit()
 drgBLUP_cor <- cor(drgBLUP, use='pairwise')
 Figplot2 <- corrplot::corrplot(drgBLUP_cor, method = "number", sig.level = 0.001, type = "upper", insig = "blank")
 mtext("drgBLUP", at=6.5, line=1, cex=1.5) 

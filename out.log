@@ -1,0 +1,11 @@
+
+VCFtools - 0.1.16
+(C) Adam Auton and Anthony Marcketta 2009
+
+Parameters as interpreted:
+	--gzvcf data/VCF/BreedBaseGenotypes.vcf.gz
+
+Using zlib version: 1.2.11
+After filtering, kept 7417 out of 7417 Individuals
+After filtering, kept 61239 out of a possible 61239 Sites
+Run Time = 10.00 seconds

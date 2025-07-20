@@ -7,8 +7,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-## Analysis directly related to the manuscrit
-
+## Analysis with results directly shown on the manuscrit
 ```{r}
 library(tidyverse); library(data.table); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm); library(gt); library(reactablefmtr); library(corrplot); library(factoextra); library(FactoMineR)
 MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
