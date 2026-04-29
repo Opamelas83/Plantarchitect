@@ -19,7 +19,7 @@ MyArchiphenos_finalW <- MyArchiphenos_final %>% filter(!ArchiTRait %in% c("DMC",
 #length(unique(MyArchiphenos_finalW$studyName))[1] 239
 #length(unique(MyArchiphenos_finalW$Location)) 27
 MySummaryData  <- MyArchiphenos_finalW %>% group_by(Trait, `Breeding program`, `Trial design`) %>% summarise(Year= length(unique(Year)), Location = length(unique(Location)), `nb Trials` = length(unique(studyName)), `nb clones` = length(unique(germplasmName)))
-write_csv(MySummaryData , "Result/MySummaryData.csv", append = FALSE)
+write_csv(MySummaryData, "Result/MySummaryData.csv", append = FALSE)
 ##Summary table for Shape trait
 Shapephenos_filtered <- read_csv("data/Shapephenos_filtered.csv", col_names = TRUE) 
 #length(unique(Shapephenos_filtered$studyName)) 18

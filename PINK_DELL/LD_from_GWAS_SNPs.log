@@ -1,0 +1,29 @@
+PLINK v1.90b7 64-bit (16 Jan 2023)
+Options in effect:
+  --bfile BreedBaseGenotypesD
+  --extract chr_all_block.txt
+  --ld-window 99999999
+  --ld-window-kb 20000
+  --ld-window-r2 0
+  --out LD_from_GWAS_SNPs
+  --r2
+
+Hostname: Michelle-okoma.local
+Working directory: /Users/mo367/Desktop/Cornell/Analy_project/Plantarchitect/PINK_DELL
+Start time: Sat Dec 27 13:47:45 2025
+
+Random number seed: 1766864865
+16384 MB RAM detected; reserving 8192 MB for main workspace.
+61239 variants loaded from .bim file.
+7417 people (0 males, 0 females, 7417 ambiguous) loaded from .fam.
+Ambiguous sex IDs written to LD_from_GWAS_SNPs.nosex .
+--extract: 8 variants remaining.
+Using up to 9 threads (change this with --threads).
+Before main variant filters, 7417 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+Total genotyping rate is exactly 1.
+8 variants and 7417 people pass filters and QC.
+Note: No phenotypes present.
+--r2 to LD_from_GWAS_SNPs.ld ... done.
+
+End time: Sat Dec 27 13:47:45 2025

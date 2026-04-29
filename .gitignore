@@ -9,3 +9,9 @@ analysis/*png
 analysis/*html
 analysis/*_cache
 analysis/site_libs
+PINK_DELL/LD_decay_plot.pdf
+PINK_DELL/*.vcf.gz
+PINK_DELL/*.ld
+PINK_DELL/*.bed
+Result/GAPIT_R/*.pdf
+Result/LD_decay_plot.pdf

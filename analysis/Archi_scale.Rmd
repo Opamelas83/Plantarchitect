@@ -27,13 +27,13 @@ Shapephenos_plantsum <- Shapephenos_plant %>% filter(!(`Plant type`) %in% c("Non
 
 Shapephenos_plantsum$trialType <- factor(Shapephenos_plantsum$trialType, 
                                       levels = c("CET", "PYT", "AYT", "UYT"))
-Shapephenos_plantsum$`Plant type` <- factor(Shapephenos_plantsum$`Plant type`,      
+Shapephenos_plantsum$`plant shape` <- factor(Shapephenos_plantsum$`Plant type`,      
                         levels = c("Compact", "Open", "Umbrella", "Cylindrical"))
 #jpeg(filename = "Result/PlantShapedistri.jpeg")
 ggplot(data = Shapephenos_plantsum, aes(x = trialType, y = `Value (%)`, 
-                                group = `Plant type`)) +
-  geom_point(aes(color = `Plant type`), size = 3) +
-  geom_line(aes(color=`Plant type`), linetype = 81) +
+                                group = `plant shape`)) +
+  geom_point(aes(color = `plant shape`), size = 3) +
+  geom_line(aes(color=`plant shape`), linetype = 81) +
   scale_color_brewer(palette = "Dark2") +
  ggtitle("Plant shape") +
   xlab("breeding stage") #+

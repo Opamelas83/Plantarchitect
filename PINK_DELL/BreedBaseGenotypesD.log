@@ -1,0 +1,29 @@
+PLINK v1.9.0-b.7.11 64-bit (19 Aug 2025)
+Options in effect:
+  --allow-extra-chr
+  --double-id
+  --make-bed
+  --out BreedBaseGenotypesD
+  --vcf BreedBaseGenotypesD.vcf.gz
+
+Hostname: JH111CAENS02
+Working directory: /home/megnin/Desktop/PINK_DELL
+Start time: Mon Nov  3 10:58:31 2025
+
+Random number seed: 1762189111
+95294 MB RAM detected; reserving 47647 MB for main workspace.
+--vcf: BreedBaseGenotypesD-temporary.bed + BreedBaseGenotypesD-temporary.bim +
+BreedBaseGenotypesD-temporary.fam written.
+61239 variants loaded from .bim file.
+7417 people (0 males, 0 females, 7417 ambiguous) loaded from .fam.
+Ambiguous sex IDs written to BreedBaseGenotypesD.nosex .
+Using 1 thread (no multithreaded calculations invoked).
+Before main variant filters, 7417 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+Total genotyping rate is exactly 1.
+61239 variants and 7417 people pass filters and QC.
+Note: No phenotypes present.
+--make-bed to BreedBaseGenotypesD.bed + BreedBaseGenotypesD.bim +
+BreedBaseGenotypesD.fam ... done.
+
+End time: Mon Nov  3 10:58:40 2025

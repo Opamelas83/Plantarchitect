@@ -73,7 +73,7 @@ MyArchiphenos_finalf_IITA$Trait <- factor(MyArchiphenos_finalf_IITA$Trait,
                              aes(x=trialType,y=ArchiValue, fill = Trait)) +
   geom_boxplot(stat = "boxplot") +
   stat_summary(fun=mean, na.rm = TRUE) +
-  labs(x= "Tria type", y= "Values") + theme_bw() +
+  labs(x= "Trial type", y= "Values") + theme_bw() +
     facet_grid(Trait~trialType, scales = "free") +
    ggtitle("IITA")
   #geom_text(data = MyArchiphenos_finalf,
@@ -81,18 +81,19 @@ MyArchiphenos_finalf_IITA$Trait <- factor(MyArchiphenos_finalf_IITA$Trait,
   #theme(legend.position='none')
 #dev.off()
 
-MyArchiphenos_finalf_NRCRI <- MyArchiphenos_finalf %>% filter(programName %in% "NRCRI")
+MyArchiphenos_finalf_NRCRI <- MyArchiphenos_finalf %>% filter(programName %in% "NRCRI") %>%
+  filter(!(Trait %in% "BranchlevelNum"))
 
   MyArchiphenos_finalf_NRCRI$trialType <- factor(MyArchiphenos_finalf_NRCRI$trialType,                                     levels = c("CET", "PYT", "AYT", "UYT"))
 # Reordering group factor levels
 MyArchiphenos_finalf_NRCRI$Trait <- factor(MyArchiphenos_finalf_NRCRI$Trait,      
-                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum"))#"PlantArchitecture"
+                        levels = c("PlantHeight", "FirstBranchHeight"))#"PlantArchitecture""BranchlevelNum"
 #jpeg(filename = "Result/NRCRI_Traits_distribution.jpeg")
  CompFIG2 <- ggplot(data = MyArchiphenos_finalf_NRCRI,
                              aes(x=trialType,y=ArchiValue, fill = Trait)) +
   geom_boxplot(stat = "boxplot") +
   stat_summary(fun=mean, na.rm = TRUE) +
-  labs(x= "Tria type", y= "Values") + theme_bw() +
+  labs(x= "Trial type", y= "Values") + theme_bw() +
     facet_grid(Trait~trialType, scales = "free") +
    ggtitle("NRCRI")
  nt <- theme(legend.position='none')
@@ -417,9 +418,11 @@ MML_drgblups <- General_results %>%
     unnest(BLUPs) %>%
     dplyr::select(GermplasmName,Trait,drgBLUP) %>%
     spread(Trait,drgBLUP)
-#Correlation between trait using the drgBLUPs VALUE
+##### Correlation between trait using the drgBLUPs VALUE*for the manuscript
 drgBLUP <- MML_drgblups %>% # dplyr::select(-GermplasmName) %>%
-  dplyr::select(PlantHeight, FirstBranchHeight, BranchlevelNum, Cylindrical, Umbrella, Open, Compact, DMC, FRWT, FTWT) #%>% na.omit()
+  dplyr::select(PlantHeight, FirstBranchHeight, BranchlevelNum, Cylindrical, Umbrella, Open, Compact, DMC, FRWT, FTWT) %>% #na.omit()
+  mutate(FYLD = FRWT, TYLD = FTWT) %>%
+  dplyr::select(-FRWT, -FTWT)
 drgBLUP_cor <- cor(drgBLUP, use='pairwise')
 Figplot2 <- corrplot::corrplot(drgBLUP_cor, method = "number", sig.level = 0.001, type = "upper", insig = "blank")
 mtext("drgBLUP", at=6.5, line=1, cex=1.5) 

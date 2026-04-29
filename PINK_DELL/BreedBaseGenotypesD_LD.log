@@ -1,0 +1,31 @@
+PLINK v1.9.0-b.7.11 64-bit (19 Aug 2025)
+Options in effect:
+  --bfile BreedBaseGenotypesD
+  --ld-window 99999
+  --ld-window-kb 1000
+  --ld-window-r2 0
+  --out BreedBaseGenotypesD_LD
+  --r2
+
+Hostname: JH111CAENS02
+Working directory: /home/megnin/Desktop/PINK_DELL
+Start time: Mon Nov  3 11:15:03 2025
+
+Random number seed: 1762190103
+95294 MB RAM detected; reserving 47647 MB for main workspace.
+61239 variants loaded from .bim file.
+7417 people (0 males, 0 females, 7417 ambiguous) loaded from .fam.
+Ambiguous sex IDs written to BreedBaseGenotypesD_LD.nosex .
+Using up to 39 threads (change this with --threads).
+Before main variant filters, 7417 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+Total genotyping rate is exactly 1.
+61239 variants and 7417 people pass filters and QC.
+Note: No phenotypes present.
+Running --r2 with the following filters:
+  --ld-window: 99999
+  --ld-window-kb: 1000
+  --ld-window-r2: 0
+--r2 to BreedBaseGenotypesD_LD.ld ... done.
+
+End time: Mon Nov  3 11:15:06 2025
