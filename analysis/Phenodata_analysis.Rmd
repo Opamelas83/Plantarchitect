@@ -413,19 +413,19 @@ results <- readRDS("Result/GeneralMML_result.rds")
 results_Shape <- readRDS("Result/results_Shape.rds")
 General_results <- bind_rows(results,results_Shape)
 # COMPUTE SELIND FROM BLUPs
-MML_drgblups <- General_results %>%
+MML_blups <- General_results %>%
     dplyr::select(Trait,BLUPs) %>%
     unnest(BLUPs) %>%
-    dplyr::select(GermplasmName,Trait,drgBLUP) %>%
-    spread(Trait,drgBLUP)
-##### Correlation between trait using the drgBLUPs VALUE*for the manuscript
-drgBLUP <- MML_drgblups %>% # dplyr::select(-GermplasmName) %>%
+    dplyr::select(GermplasmName,Trait,BLUP) %>%
+    spread(Trait,BLUP)
+##### Correlation between trait using the BLUPs VALUE*instead of drgBLUPsfor the manuscript after reviewer inquiry
+allBLUP <- MML_blups %>% # dplyr::select(-GermplasmName) %>%
   dplyr::select(PlantHeight, FirstBranchHeight, BranchlevelNum, Cylindrical, Umbrella, Open, Compact, DMC, FRWT, FTWT) %>% #na.omit()
   mutate(FYLD = FRWT, TYLD = FTWT) %>%
   dplyr::select(-FRWT, -FTWT)
-drgBLUP_cor <- cor(drgBLUP, use='pairwise')
-Figplot2 <- corrplot::corrplot(drgBLUP_cor, method = "number", sig.level = 0.001, type = "upper", insig = "blank")
-mtext("drgBLUP", at=6.5, line=1, cex=1.5) 
+allBLUP_cor <- cor(allBLUP, use='pairwise')
+Figplot2 <- corrplot::corrplot(allBLUP_cor, method = "number", sig.level = 0.001, type = "upper", insig = "blank")
+mtext("BLUP", at=6.5, line=1, cex=1.5) 
 ```
 #Variance component
 ```{r}
