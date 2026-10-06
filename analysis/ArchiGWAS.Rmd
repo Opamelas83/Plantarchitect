@@ -192,8 +192,8 @@ scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2)) +
 labs(x = "Distance between SNPs (kb)", y = expression(r^2)) +
 theme_classic(base_size = 14)
 p
-ggsave(filename = "output/Figure8_LD_decay.jpeg",
-  plot = p, width = 8, height = 7, units = "in", dpi = 300)
+ggsave(filename = "Result/Figure8_LD_decay.pdf",
+  plot = p, width = 8, height = 7, units = "in")
 ```
 ## PREPARE PHENOTYPE DATA FOR GAPIT
 ```{r}

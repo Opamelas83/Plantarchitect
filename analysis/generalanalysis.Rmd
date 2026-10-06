@@ -7,9 +7,10 @@ editor_options:
   chunk_output_type: console
 ---
 
-## Analysis with results directly shown on the manuscrit
+##1. Analysis with results directly shown on the manuscrit
 ```{r}
-library(tidyverse); library(data.table); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm); library(gt); library(reactablefmtr); library(corrplot); library(factoextra); library(FactoMineR)
+library(tidyverse); library(lme4); library(data.table); library(here); library(magrittr); library(lubridate); library(MuMIn); library(arm); library(gt); library(reactablefmtr); library(corrplot); library(factoextra); library(FactoMineR); library(purrr); library(lemon)
+
 MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
 #length(unique(MyArchiphenos_final$germplasmName)) 9062
 #length(unique(MyArchiphenos_final$studyName)) 274
@@ -52,7 +53,228 @@ colnames(SummaryData) <- c("Trait", "Breeding program", "Trial design", "Locatio
 SummaryData <- SummaryData[SummaryData$`nb Trials`!=0,]
 MySummaryData <- SummaryData %>% group_by(Trait,`Breeding program`, `Trial design`) %>% summarise(Year= length(unique(Year)), Location = length(unique(Location)), `nb Trials` = sum(`nb Trials`, na.rm = T))#`nb clones`=sum(`nb clones`, na.rm = T)
 ```
-# 1. PREPARE THE 3,113-ACCESSION GWAS GENOTYPE PANEL
+
+```{r}
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
+MyArchiphenos_final %>% dplyr::select(programName, Year, ArchiTRait, studyName) %>% unique() -> SummaryData1
+SummaryData2 <- table(SummaryData1$ArchiTRait, SummaryData1$programName, SummaryData1$Year) %>% as.data.frame()
+colnames(SummaryData2) <- c("ArchiTRait", "programName", "Year", "nb_Trials")
+SummaryData2 <- SummaryData2[SummaryData2$`nb_Trials`!=0,]
+SummaryData3 <- SummaryData2 %>% reactable(groupBy = c("ArchiTRait", "programName", "Year"), columns = list(
+  "nb_Trials" = colDef(aggregate = "sum")), defaultPageSize = 15)
+#New for presentation
+SummaryData_present <- SummaryData2 %>% 
+  group_by(ArchiTRait) %>%
+  summarise(programName = length(unique(programName)),
+            Year = length(Year), 
+            nb_Trials = length(nb_Trials))
+#reactablefmtr::save_reactable_test(SummaryData2, "SummaryData.html")
+#reactablefmtr::save_reactable_test(SummaryData2, "SummaryData.png")
+```
+#2.Data distribution visualization with replicated and non_replicated trials and outliers removed
+```{r}
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
+MyArchiphenos_finalf <- MyArchiphenos_final %>% filter(ArchiTRait %in% c("PlantHeight", "FirstBranchHeight", "BranchlevelNum")) %>% rename(Trait = ArchiTRait) #"PlantArchitecture"
+# Mean Comparison of Breeding Programs for "PlantHeight", "FirstBranchHeight", and "BranchLevelNum Traits"
+## mean value by trait by group
+Meangroup <- MyArchiphenos_finalf %>% group_by(Trait, programName, trialType) %>%
+  get_summary_stats(ArchiValue, type = "mean_sd")
+write.csv(Meangroup , "Result/Meangroup.csv", append = FALSE)
+
+finalf_AOV <- MyArchiphenos_finalf %>% 
+  pivot_wider(names_from = Trait, values_from =ArchiValue) 
+##ANOVA
+PlantHeight_aov <- aov(PlantHeight ~ programName*trialType, data = finalf_AOV)
+PlantHeight_aov_sum <- data.frame(summary(PlantHeight_aov)[[1]])
+write.table(PlantHeight_aov_sum , "Result/PlantHeight_aov_sum.csv", append = FALSE, col.names = NA, row.names = TRUE)
+PlantHeight_aov_Tuk <- TukeyHSD(PlantHeight_aov)
+Table1 <- data.frame(PlantHeight_aov_Tuk$`programName:trialType`)
+#write.table(Table1 , "T1.csv", append = FALSE)
+FirstBranchHeight_aov <- aov(FirstBranchHeight ~ programName*trialType, data = finalf_AOV)
+FirstBranchHeight_aov_sum <- data.frame(summary(FirstBranchHeight_aov)[[1]])
+write.table(FirstBranchHeight_aov_sum , "Result/FirstBranchHeight_aov_sum.csv", append = FALSE)
+FirstBranchHeight_aov_Tuk <- TukeyHSD(FirstBranchHeight_aov)
+Table2 <- data.frame(FirstBranchHeight_aov_Tuk$`programName:trialType`)
+#write.table(Table2 , "T2.csv", append = FALSE)
+BranchlevelNum_aov <- aov(BranchlevelNum ~ trialType, data = finalf_AOV)
+BranchlevelNum_aov_sum <- data.frame(summary(BranchlevelNum_aov)[[1]])
+write.table(BranchlevelNum_aov_sum , "Result/BranchlevelNum_aov_sum.csv", append = FALSE)
+BranchlevelNum_aov_Tuk <- TukeyHSD(BranchlevelNum_aov)
+Table3 <- data.frame(BranchlevelNum_aov_Tuk$`trialType`)
+#write.table(Table3 , "T3.csv", append = FALSE)
+#summary.aov(General_AOV)
+
+##Data distribution plot visualization
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
+MyArchiphenos_finalf <- MyArchiphenos_final %>% filter(ArchiTRait %in% c("PlantHeight", "FirstBranchHeight", "BranchlevelNum")) %>% rename(Trait = ArchiTRait)
+MyArchiphenos_finalf_IITA <- MyArchiphenos_finalf %>% filter(programName %in% "IITA")
+MyArchiphenos_finalf_IITA$trialType <- factor(MyArchiphenos_finalf_IITA$trialType,                                     levels = c("CET", "PYT", "AYT", "UYT"))
+# Reordering group factor levels
+MyArchiphenos_finalf_IITA$Trait <- factor(MyArchiphenos_finalf_IITA$Trait,      
+                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum"))#"PlantArchitecture"
+#jpeg(filename = "Result/IITA_Traits_distribution.jpeg")
+ CompFIG1 <- ggplot(data = MyArchiphenos_finalf_IITA,
+                             aes(x=trialType,y=ArchiValue, fill = Trait)) +
+  geom_boxplot(stat = "boxplot") +
+  stat_summary(fun=mean, na.rm = TRUE) +
+  labs(x= "Trial type", y= "Values") + theme_bw() +
+    facet_grid(Trait~trialType, scales = "free") +
+   ggtitle("IITA")
+  #geom_text(data = MyArchiphenos_finalf,
+  #          aes(label = ArchiValue, y = ArchiValue + 0.08)) +
+  #theme(legend.position='none')
+#dev.off()
+
+MyArchiphenos_finalf_NRCRI <- MyArchiphenos_finalf %>% filter(programName %in% "NRCRI") %>%
+  filter(!(Trait %in% "BranchlevelNum"))
+
+  MyArchiphenos_finalf_NRCRI$trialType <- factor(MyArchiphenos_finalf_NRCRI$trialType,                                     levels = c("CET", "PYT", "AYT", "UYT"))
+# Reordering group factor levels
+MyArchiphenos_finalf_NRCRI$Trait <- factor(MyArchiphenos_finalf_NRCRI$Trait,      
+                        levels = c("PlantHeight", "FirstBranchHeight"))#"PlantArchitecture""BranchlevelNum"
+#jpeg(filename = "Result/NRCRI_Traits_distribution.jpeg")
+ CompFIG2 <- ggplot(data = MyArchiphenos_finalf_NRCRI,
+                             aes(x=trialType,y=ArchiValue, fill = Trait)) +
+  geom_boxplot(stat = "boxplot") +
+  stat_summary(fun=mean, na.rm = TRUE) +
+  labs(x= "Trial type", y= "Values") + theme_bw() +
+    facet_grid(Trait~trialType, scales = "free") +
+   ggtitle("NRCRI")
+ nt <- theme(legend.position='none')
+pdf(
+  file = "Result/TraitDistribution.pdf",
+  width = 8,
+  height = 5, onefile = FALSE)
+#or tiff(filename = "Result/TraitDistribution.tiff",
+#  width = 8, height = 5), units = "in", res = 600, compression = "lzw")
+grid_arrange_shared_legend(
+  CompFIG1 + nt,
+  CompFIG2 + nt,
+  ncol = 2,
+  nrow = 1
+)
+dev.off()
+
+#Residuals Distribution by trait
+results <- read_csv("Result/MixedModel_replicated.csv", col_names = TRUE)
+results_nonrep <- read_csv("Result/MixedModel_nonreplicated.csv", col_names = TRUE)
+Allresults <- bind_rows(results, results_nonrep) %>% dplyr::select(Trial, Trait, VarE) %>% rename(ArchiTRait = Trait)
+MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE)
+MyArchiphenos_final <- MyArchiphenos_final %>% group_by(trialType, studyName, ArchiTRait) %>% summarise(studyName = unique(studyName)) %>% rename(Trial = studyName)
+My_residuals <- left_join(MyArchiphenos_final, Allresults) 
+My_residuals <- My_residuals %>% filter(ArchiTRait %in% c("PlantHeight", "FirstBranchHeight", "BranchlevelNum"))#"PlantArchitecture"
+
+My_residuals$trialType <- factor(My_residuals$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT")) 
+My_residuals$Trait <- factor(My_residuals$ArchiTRait,      
+                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum"))# "PlantArchitecture"
+ggplot(data = My_residuals,
+                             aes(x=trialType,y=VarE, fill = ArchiTRait)) +
+  geom_boxplot(stat = "boxplot") +
+  stat_summary(fun=mean, na.rm = TRUE) +
+  labs(x= "Tria type", y= "Residuals value") + theme_bw() +
+    facet_grid(Trait~trialType, scales = "free")
+```
+# Distribution of plant shape
+```{r}
+MyArchiphenos <- read_csv("data/MyArchiphenotypes.csv", col_names = TRUE)
+ShapeTRaits <- c("Cylindrical_type", "Umbrella_type", "Open_type", "Compact_type")
+Shapephenos <- MyArchiphenos %>% 
+     # Convert the data to "long format" 
+     pivot_longer(cols = all_of(ShapeTRaits), 
+                  names_to = "ShapeTRait", values_to = "ShapeValue") %>%
+     # Remove missing values 
+     filter(!is.na(ShapeValue)) %>% 
+   filter(!is.na(replicate)) %>% 
+     filter(!is.na(germplasmName))
+
+Shapephenos_plant <- Shapephenos %>% dplyr::select(Year, trialType, ShapeTRait, ShapeValue) %>% filter (!is.na(ShapeValue)) %>% mutate(`Plant type` = ShapeValue)
+#ShapeTRait", values_to = "ShapeValue"
+Shapephenos_plantsum <- Shapephenos_plant %>% filter(!(`Plant type`) %in% c("Non_Cylindrical", "Non_Umbrella", "Non_Open","Non_Compact")) %>% group_by(trialType, `Plant type`) %>% summarise(numb = length(`Plant type`)) %>% mutate(`Value (%)` = round((numb/rowsum(numb, trialType)) * 100)) #"Non_Erect"
+
+Shapephenos_plantsum$trialType <- factor(Shapephenos_plantsum$trialType, 
+                                      levels = c("CET", "PYT", "AYT", "UYT"))
+Shapephenos_plantsum$`plant shape` <- factor(Shapephenos_plantsum$`Plant type`,      
+                        levels = c("Compact", "Open", "Umbrella", "Cylindrical"))
+#jpeg(filename = "Result/PlantShapedistri.jpeg")
+pdf(
+  file = "Result/PlantShapedistri.pdf",
+  width = 8,
+  height = 7
+)
+
+ggplot(data = Shapephenos_plantsum, aes(x = trialType, y = `Value (%)`, 
+                                group = `plant shape`)) +
+  geom_point(aes(color = `plant shape`), size = 3) +
+  geom_line(aes(color=`plant shape`), linetype = 81) +
+  scale_color_brewer(palette = "Dark2") +
+ ggtitle("Plant shape") +
+  xlab("breeding stage") #+
+ggsave("Result/PlantShapedistri.png",  scale = 1,)
+#theme(axis.title.x=element_blank())
+dev.off()
+```
+###3.Correlation between trait using the BLUPs VALU
+```{r}
+# For calling original result objects 
+results <- readRDS("Result/GeneralMML_result.rds")
+results_Shape <- readRDS("Result/results_Shape.rds")
+General_results <- bind_rows(results,results_Shape)
+# COMPUTE SELIND FROM BLUPs
+MML_blups <- General_results %>%
+    dplyr::select(Trait,BLUPs) %>%
+    unnest(BLUPs) %>%
+    dplyr::select(GermplasmName,Trait,BLUP) %>%
+    spread(Trait,BLUP)
+# Correlation between trait using the BLUPs VALUE*instead of drgBLUPsfor the manuscript after reviewer inquiry
+allBLUP <- MML_blups %>% # dplyr::select(-GermplasmName) %>%
+  dplyr::select(PlantHeight, FirstBranchHeight, BranchlevelNum, Cylindrical, Umbrella, Open, Compact, DMC, FRWT, FTWT) %>% #na.omit()
+  mutate(FYLD = FRWT, TYLD = FTWT) %>%
+  dplyr::select(-FRWT, -FTWT)
+allBLUP_cor <- cor(allBLUP, use='pairwise')
+# SAVE FIGURE
+pdf(
+  file = "Result/BLUP_Correlation.pdf",
+  width = 8,
+  height = 7)
+
+Figplot2 <- corrplot::corrplot(allBLUP_cor, method = "number", sig.level = 0.001, type = "upper", insig = "blank")
+mtext("BLUP", at=6.5, line=1, cex=1.5) 
+dev.off()
+```
+#4.Variance component
+```{r}
+results <- readRDS("Result/GeneralMML_result.rds")
+results_Shape <- readRDS("Result/results_Shape.rds")
+General_results <- bind_rows(results,results_Shape)
+Vartable <- General_results %>% 
+  dplyr::select(Trait, H2, VarComps) %>%
+  unnest(VarComps) %>%
+  dplyr::select(Trait, H2, germplasmName, Residual) %>%
+  mutate(Vg = round(germplasmName, digits = 2), 
+         Ve = round(Residual, digits = 2)) %>% 
+  dplyr::select(Trait, H2, Vg, Ve) 
+write_csv(Vartable, "Result/Vartable.csv", append = FALSE)
+```
+
+#Check the correlation between trait with the original data
+```{r}
+#MyArchiphenos_final <- read_csv("data/MyArchiphenos_final.csv", col_names = TRUE) 
+#MyArchiphenos_final$trialType <- factor(MyArchiphenos_final$trialType, 
+#                                      levels = c("CET", "PYT", "AYT", "UYT"))
+#MyArchiphenos_final_cor <- MyArchiphenos_final %>% #filter(ArchiTRait == "PlantArchitecture")
+#  dplyr::group_by(trialType, ArchiTRait, germplasmName) %>%
+#  summarise(Value = mean(ArchiValue, na.rm = T)) 
+#MyArchiphenos_final_cor <- MyArchiphenos_final_cor %>% spread(ArchiTRait, Value) #%>% na.omit()
+#Cor by trial type
+#MyArchiphenos_cor1 <- MyArchiphenos_final_cor %>%
+#  filter(trialType == "CET") %>% ungroup() %>% dplyr::select (BranchlevelNum, FirstBranchHeight, PlantHeight,  DMC, FRWT, FTWT) %>% na.omit()#PlantArchitecture,, MCMDS
+#MyArchiphenos_cor1 <- cor(MyArchiphenos_cor1)
+#corrplot::corrplot(MyArchiphenos_cor1, method = "number", type #= "upper", sig.level = 0.01, insig = "blank")
+#mtext("CET", at=6, line=1, cex=2)
+```
+
+# 5. PREPARE THE 3,113-ACCESSION GWAS GENOTYPE PANEL
 ```{r}
 # Load genotype dosage matrix
 dosages <- readRDS("data/dosages.rds") 
@@ -65,7 +287,7 @@ dosages_GWAS <- dosages[GWAS_ID, , drop = FALSE]
 dim(dosages_GWAS) # 3113 61158 
 length(unique(rownames(dosages_GWAS))) # 3113 
 ```
-# 2. Assign breeding-program information to GWAS accessions
+# 6. Assign breeding-program information to GWAS accessions
 ```{r}
 ## Phenotype-derived file containing breeding-program information: To get the breeding program name for all the genotypes, I downloaded a phenotype file including all the trials.
 Access <- read_csv(here::here("data/Access_IITA_NRCRI.csv"))#genotypes from NRCRI and IITA
@@ -81,7 +303,7 @@ Access2 <- AccessN %>%
       n_distinct(programName) > 1, "IITA and NRCRI",
       first(programName)), .groups = "drop")
 ```
-# 3. Add breeding-program information to the GWAS dosage matrix
+# 7. Add breeding-program information to the GWAS dosage matrix
 ```{r}
 #convert my 3,113-row dosage matrix
 Mydosages_GWAS <- as.data.frame(dosages_GWAS) %>%
@@ -99,7 +321,7 @@ Mydosages_Pro %>% count(programName)#   programName    n
 #2 IITA and NRCRI   83
 #3          NRCRI    5
 ```
-# 4. Prepare genotype matrix for PCA
+# 8. Prepare genotype matrix for PCA
 ```{r}
 #Remove metadata columns and retain only SNP dosage data
 Mydosages_Pca <- Mydosages_Pro %>%
@@ -112,13 +334,15 @@ Mypca <- prcomp(Mydosages_Pca, center = TRUE, scale. = FALSE)
 # Save PCA
 saveRDS(Mypca,
   here::here("output", "GWAS_pca_result.rds"))
+
+```
+# 9. FIGURE 6 – POPULATION STRUCTURE OF THE GWAS PANEL
+```{r}
+Mypca <- readRDS("output/GWAS_pca_result.rds")
 # Calculate variance explained
 pca_variance <- 100 * (Mypca$sdev^2 /
     sum(Mypca$sdev^2))
 pca_variance[1:3]# PC1 = 7.280030; PC2 = 3.689614; PC3 = 2.944112
-```
-# 5. FIGURE 6 – POPULATION STRUCTURE OF THE GWAS PANEL
-```{r}
 # Add breeding-program labels and sample sizes for Figure 6
 Mydosages_Pro$`Breeding Program` <- factor(
   Mydosages_Pro$programName,
@@ -128,11 +352,10 @@ Mydosages_Pro$`Breeding Program` <- factor(
     "IITA and NRCRI (n = 83)",
     "NRCRI (n = 5)"))
 # Plot individuals from PCA
-jpeg(
-  filename = "output/PCA_indiv.jpeg",
-  width = 1800,
-  height = 1400,
-  res = 200)
+pdf(
+  file = "Result/PCA_indiv.pdf",
+  width = 9,
+  height = 7)
 print(
   fviz_pca_ind(
     Mypca,
@@ -147,21 +370,20 @@ print(
       x = paste0("PC1 (", round(pca_variance[1], 1), "%)"),
       y = paste0("PC2 (", round(pca_variance[2], 1), "%)")))
 dev.off()
-
 ```
-# 6.SUPPLEMENTARY FIGURE: PCA SCREE PLOTPCA scree plot
+# 10.SUPPLEMENTARY FIGURE: PCA SCREE PLOTPCA scree plot
 ```{r}
-jpeg(
-  filename = "output/PCA_screeplot.jpeg",
-  width = 1800,
-  height = 1400,
-  res = 200)
+
+pdf(
+  file = "Result/PCA_screeplot.pdf",
+  width = 9,
+  height = 7)
 fviz_eig(Mypca,
   addlabels = TRUE,
   ncp = 10)
 dev.off()
 ```
-# 7. SNP contributions to PC1 and PC2
+# 11. SNP contributions to PC1 and PC2
 ```{r}
 #SNP contribution analysis can remain
 Mypca <- readRDS(here::here("output", "GWAS_pca_result.rds"))
@@ -194,13 +416,13 @@ dosagemarker <- dosagecolname %>%
   mutate(position = round(position/100000, digits=1))
 Dosage_pca <- left_join(pca_var_dim12, dosagemarker)
 write_csv(Dosage_pca, "output/Dosage_pca.csv", append = FALSE)
+```
+# 12. FIGURE 7 – SNP CONTRIBUTIONS TO PC1 AND PC2
+```{r}
 Dosage_pca <- read_csv("output/Dosage_pca.csv")
 Dosage_pca <- Dosage_pca %>%
   mutate(PC1 = Dim.1, PC2 = Dim.2,
     position = position/10, .keep = "unused")
-```
-# 9. FIGURE 7 – SNP CONTRIBUTIONS TO PC1 AND PC2
-```{r}
 Dosage_pca$chromosome <- factor(
   Dosage_pca$chromosome,
   levels = as.character(1:18))
@@ -220,9 +442,14 @@ CompFIG2 <- ggplot(Dosage_pca, aes(x = position, y = `PC2`)) +
 # library(ggpubr)
 Figure7 <- ggarrange(CompFIG1,CompFIG2,
   ncol = 1, nrow = 2)
-Figure7
+pdf(
+  file = "Result/Figure7.pdf",
+  width = 12,
+  height = 7)
+print(Figure7)
+dev.off()
 ```
-# 10. PCA INDIVIDUAL CONTRIBUTIONS USED IN ORIGINAL WORKFLOW
+# 13. PCA INDIVIDUAL CONTRIBUTIONS USED IN ORIGINAL WORKFLOW
 ```{r}
 # For GWAS analysis
 pca_ind <- get_pca_ind(Mypca)

@@ -62,29 +62,30 @@ SIwts<-c(PlantHeight=4,
          PlantArchitecture=4)
 #SIwts
 ```
-
-#Execute cross-validation
+##1. Run genomic prediction cross-validation
 ```{r}
-#Plan to do this by breeging program too.
-#For A 
-standardCV<-runCrossVal(blups=blups,
+## GENOMIC PREDICTION: CROSS-VALIDATION
+#For A Additive model
+standardCV_A<-runCrossVal(blups=blups,
                         modelType="A",
                         selInd=FALSE,
                         grms=list(A=A),
                         nrepeats=3,nfolds=5,
                         gid="GID",seed=999999999,
                         ncores=10)
-#For "AD"
-standardCV<-runCrossVal(blups=blups,
+saveRDS(standardCV_A,file = here::here("output","A_KfoldsCval.rds"))
+#For "AD" Additive + dominance model
+standardCV_AD<-runCrossVal(blups=blups,
                         modelType="AD",
                         selInd=FALSE,
                         grms=list(A=A,D=D),
                         nrepeats=3,nfolds=5,
                         gid="GID",seed=999999999,
                         ncores=10)
-
-#For "DirDim"
-standardCV<-runCrossVal(blups=blups,
+saveRDS(standardCV_AD,file = here::here("output","AD_KfoldsCval.rds"))
+#For "DirDom" Directional dominance model
+# Exploratory analysis; not included in the final model comparison
+standardCV_DirDom<-runCrossVal(blups=blups,
                         modelType="DirDom",
                         selInd=FALSE,
                         grms=list(A=A,D=D),
@@ -92,78 +93,135 @@ standardCV<-runCrossVal(blups=blups,
                         nrepeats=3,nfolds=5,
                         gid="GID",seed=999999999,
                         ncores=8)
-#standardCV %>% unnest(accuracyEstOut)
-#Plot result
-saveRDS(standardCV,file = here::here("output","AD_KfoldsCval.rds"))
-#standardCV <- readRDS("output/AD_KfoldsCval.rds")
-jpeg(filename = "output/AD_KfoldCval.jpeg")
-
-standardCV %>% 
-     unnest(accuracyEstOut) %>% 
-     mutate(Trait = factor(Trait,      
-                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum", "PlantArchitecture", "Cylindrical_type", "Umbrella_type", "Open_type", "Compact_type", "Erectibility"))) %>% #
-     dplyr::select(repeats,id,predOf,Trait,Accuracy) %>%
-filter(!(Trait == "PlantArchitecture")) %>%
-     ggplot(.,aes(x=Trait,y=Accuracy,fill=Trait)) + 
-  ggtitle("AD_model") +
-  geom_boxplot() + theme_bw()
-dev.off()
-# cross validation by breeding program
-# cross validation by periode 
-
-standardCV_A <- readRDS("output/A_KfoldsCval.rds") 
-standardCV_AD <- readRDS("output/AD_KfoldsCval.rds") 
-standardCV_DirDom <- readRDS("output/DirDom_KfoldsCval.rds") 
-
-standardCV_A <- standardCV_A %>% 
-     unnest(accuracyEstOut) %>% 
-     mutate(Trait = factor(Trait,      
-                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum", "PlantArchitecture", "Cylindrical_type", "Umbrella_type", "Open_type", "Compact_type", "Erectibility"))) %>% #
-     dplyr::select(repeats,id,predOf,Trait,Accuracy) %>%
-filter(!(Trait == "PlantArchitecture")) %>%
-  mutate(Model = "Additive")
-
-standardCV_AD <- standardCV_AD %>% 
-     unnest(accuracyEstOut) %>% 
-     mutate(Trait = factor(Trait,      
-                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum", "PlantArchitecture", "Cylindrical_type", "Umbrella_type", "Open_type", "Compact_type", "Erectibility"))) %>% #
-     dplyr::select(repeats,id,predOf,Trait,Accuracy) %>%
-filter(!(Trait == "PlantArchitecture")) %>%
-  mutate(Model= "Additive_Dom")
-##Just to try including the dom_gen model but it did not showed any significant difference
-standardCV_DirDom <- standardCV_DirDom %>% 
-     unnest(accuracyEstOut) %>% 
-     mutate(Trait = factor(Trait,      
-                        levels = c("PlantHeight", "FirstBranchHeight", "BranchlevelNum", "PlantArchitecture", "Cylindrical_type", "Umbrella_type", "Open_type", "Compact_type", "Erectibility"))) %>% #
-     dplyr::select(repeats,id,predOf,Trait,Accuracy) %>%
-filter(!(Trait == "PlantArchitecture")) %>%
-  mutate(Model= "Additive_Dom_Gen")
-
-#Merge data from the tree models
-standardCV_Sum <- rbind(standardCV_A,standardCV_AD) %>% filter(Trait != ("Erectibility"))# to better understanding I will replace "Erectibility" by "Erect_type"or no?
-write_csv(standardCV_Sum, "Result/Genomic_standardCV_Sum.csv", append = FALSE)
-#PLot results of standardCV_Sum
-standardCV_Sum %>%
-    ggplot(.,aes(x=Trait,y=Accuracy,fill=Model)) + 
-  ggtitle("Genomic prediction") +
-  geom_boxplot() + theme_bw()
-dev.off()
-#ANOVA for Comparing Model Accuracy for Each Trait
-MyAOV <- aov(Accuracy ~ Model*Trait, data = standardCV_Sum)
-summary (MyAOV)
-TukeyHSD(MyAOV, which = "Trait")
-Mean <- model.tables(MyAOV, type="means", se = TRUE)
-Mean$tables
-#rr <- standardCV_Sum %>% filter(Trait == "Compact_type")
-#MyAOV <- aov(Accuracy ~ Model, data = rr)
-summary (MyAOV)
-# cross validation by breeding program
-# cross validation by periode 
-
+saveRDS(standardCV_DirDom,file = here::here("output","DirDom_KfoldsCval.rds"))
 ```
 
-##Predict parental breeding values
+##2. Process and plot the cross-validation results
 ```{r}
+# Load results for the two models used in the final comparison
+saveRDS(standardCV,file = here::here("output","AD_KfoldsCval.rds"))
+#standardCV <- readRDS("output/AD_KfoldsCval.rds")
+
+
+jpeg(filename = "output/AD_KfoldCval.jpeg")
+
+#standardCV %>% 
+#     unnest(accuracyEstOut) %>% 
+#     mutate(Trait = factor(Trait,      
+#                        levels = c("PlantHeight", #"FirstBranchHeight", "BranchlevelNum", "PlantArchitecture", #"Cylindrical_type", "Umbrella_type", "Open_type", "Compact_type", #"Erectibility"))) %>% #
+#     dplyr::select(repeats,id,predOf,Trait,Accuracy) %>%
+#filter(!(Trait == "PlantArchitecture")) %>%
+#     ggplot(.,aes(x=Trait,y=Accuracy,fill=Trait)) + 
+#  ggtitle("AD_model") +
+#  geom_boxplot() + theme_bw()
+#dev.off()
+# cross validation by breeding program
+# cross validation by periode
+```
+
+##2. Process and plot the cross-validation results for two models 
+```{r}
+## Load results for the two models used in the final comparison 
+standardCV_A <- readRDS("output/A_KfoldsCval.rds") 
+standardCV_AD <- readRDS("output/AD_KfoldsCval.rds") 
+#standardCV_DirDom <- readRDS("output/DirDom_KfoldsCval.rds") 
+
+# Define trait order
+trait_order <- c(
+  "PlantHeight",
+  "FirstBranchHeight",
+  "BranchlevelNum",
+  "PlantArchitecture",
+  "Cylindrical_type",
+  "Umbrella_type",
+  "Open_type",
+  "Compact_type",
+  "Erectibility")
+# Process additive-model results
+standardCV_A <- standardCV_A %>% 
+     unnest(accuracyEstOut) %>%
+  mutate(Trait = factor(Trait, levels = trait_order),
+    Model = "Additive") %>%
+  dplyr::select(repeats, id, predOf, Trait, Accuracy, Model) %>%
+  filter(!Trait %in% c("PlantArchitecture", "Erectibility"))
+
+# Process additive + dominance-model results
+standardCV_AD <- standardCV_AD %>% 
+ unnest(accuracyEstOut) %>%
+  mutate(Trait = factor(Trait, levels = trait_order),
+    Model = "Additive_Dom") %>%
+  dplyr::select(repeats, id, predOf, Trait, Accuracy, Model) %>%
+  filter(!Trait %in% c("PlantArchitecture", "Erectibility"))
+
+# Combine A and AD cross-validation results
+# Erectibility is excluded from the final comparison
+standardCV_Sum <- bind_rows(
+  standardCV_A, standardCV_AD) %>%
+  filter(Trait != "Erectibility") %>%
+  droplevels()
+# Save final cross-validation results
+write_csv(standardCV_Sum,
+  "Result/Genomic_standardCV_Sum.csv")
+```
+
+## 3. COMPARE GENOMIC PREDICTION ACCURACY
+```{r}
+# ANOVA for model, trait, and model × trait effects
+standardCV_Sum <- read_csv("Result/Genomic_standardCV_Sum.csv")
+MyAOV <- aov(
+  Accuracy ~ Model * Trait,
+  data = standardCV_Sum
+)
+
+summary(MyAOV)
+
+
+# Tukey multiple comparisons among traits
+TukeyHSD(MyAOV,
+  which = "Trait")
+# Mean prediction accuracies
+Mean <- model.tables(MyAOV,
+  type = "means", se = TRUE)
+Mean$tables
+```
+## 4. GENOMIC PREDICTION FIGURE
+```{r}
+## Ensure traits are displayed in the desired order
+standardCV_Sum <- read_csv("Result/Genomic_standardCV_Sum.csv")
+standardCV_Sum <- standardCV_Sum %>%
+  mutate(
+    Trait = factor(
+      Trait,
+      levels = c(
+        "PlantHeight",
+        "FirstBranchHeight",
+        "BranchlevelNum",
+        "Cylindrical_type",
+        "Umbrella_type",
+        "Open_type",
+        "Compact_type")))
+
+# Plot genomic prediction accuracy
+Figure_GP <- ggplot(
+  standardCV_Sum,
+  aes(x = Trait, y = Accuracy, fill = Model)) +
+  geom_boxplot() +
+  labs(title = "Genomic prediction",
+    x = "Trait",
+    y = "Accuracy",
+    fill = "Model") + theme_bw()
+# Display figure
+Figure_GP
+
+# Save figure as PDF
+ggsave(filename = "Result/Genomic_prediction.pdf",
+  plot = Figure_GP,
+  width = 9, height = 6, units = "in")
+```
+
+## For training Predict parental breeding valuesCan genomic predictions be used to rank potential parents, and can family/cross performance be predicted?#
+```{r}
+#1. “Predict parental breeding values”
 blups<-readRDS(here::here("output","blups.rds"))
 A<-readRDS(file=here::here("output","kinship_add.rds"))
 
@@ -182,8 +240,7 @@ blups
 
 ```
 
-
-#Run genomic predictions
+#2.Training: Run genomic predictions
 ```{r}
 gpreds<-runGenomicPredictions(modelType="A",
                               selInd=TRUE, SIwts=SIwts,
@@ -210,7 +267,7 @@ gpreds$genomicPredOut[[1]]$varcomps[[1]]
 saveRDS(gpreds,file = here::here("output","genomicPredictions.rds"))
 ```
 
-#Accuracy of cross prediction for training
+#Training: 3. The pedigree section is doing something different again
 ```{r}
 ped<-read_delim(here::here("data","archi_pedigree.txt"),delim = "\t")
 # Keep only complete pedigree records
