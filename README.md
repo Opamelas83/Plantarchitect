@@ -1,86 +1,110 @@
-# Cassava Plant Architecture Analysis
+# Plantarchitect
 
-This repository contains the analysis workflow associated with the study:
+[workflowr]: https://github.com/Opamelas83/Plantarchitect
 
-**“Genetic basis of Cassava (*Manihot esculenta* Crantz) plant architecture and its relevance for selection of farmer-preferred varieties.”**
+This repository contains the analysis workflow associated with the
+study:
 
-The study uses historical multi-environment field-trial data from cassava breeding programs in Nigeria to characterize variation in plant architecture, evaluate relationships between plant architecture and agronomic traits, identify genomic regions associated with architecture traits, and assess the potential of genomic prediction for these traits.
+**"Genetic basis of cassava (*Manihot esculenta* Crantz) plant
+architecture and its relevance for ideotype breeding."**
+
+The study uses historical multi-environment field-trial data from
+cassava breeding programs in Nigeria to characterize variation in plant
+architecture, evaluate relationships between plant architecture and
+agronomic traits, identify genomic regions associated with architecture
+traits, and assess the potential of genomic prediction for these traits.
 
 ## Overview of the Analysis
 
 The workflow consists of four main components:
 
-1. **Phenotypic data preparation and trial quality control**
-2. **Multi-environment phenotypic analysis**
-3. **Genotype processing, population structure, and genome-wide association analysis**
-4. **Genomic prediction**
+1.  **Phenotypic data preparation and trial quality control**
+2.  **Phenotypic and multi-environment mixed-model analysis**
+3.  **Genotype processing, population structure, linkage disequilibrium,
+    and genome-wide association analysis**
+4.  **Genomic prediction and cross-validation**
 
-The principal scripts are located in the `analysis/` directory. They should be followed in the order described below.
+The principal scripts are located in the `analysis/` directory and are
+described below in their general order of use.
 
----
+------------------------------------------------------------------------
 
 ## Repository Structure
 
-```text
 Plantarchitect/
 ├── analysis/     # Main R Markdown analysis scripts
 ├── code/         # Supporting R code and functions
 ├── data/         # Phenotypic, genotypic, and intermediate input data
-├── Result/       # Tables and analysis results
-├── output/       # Intermediate R objects, matrices, and figures
+├── Result/       # Tables, figures, and analysis results
+├── output/       # Intermediate R objects and matrices
 ├── docs/         # workflowr-generated website files
 └── README.md     # Repository documentation
-```
 
----
+------------------------------------------------------------------------
 
-# Analysis Workflow
+# Phenotypic Data Preparation and Analysis
 
 ## 1. Build the Initial Phenotypic Dataset
 
 **Script:** `analysis/data_building.Rmd`
 
-This script imports and integrates phenotypic and trial metadata, evaluates trait availability across trials, selects the traits used in the study, harmonizes trait names and measurement units, derives the plant-shape variables used in subsequent analyses, and generates the initial working phenotypic dataset.
+This script imports and integrates phenotypic and trial information,
+examines trait availability across breeding programs and trials, selects
+traits for subsequent analyses, harmonizes trait names and measurement
+units, and prepares the initial working phenotypic dataset.
+
+The script includes plant architecture traits such as plant height,
+first branching height, branching level number, and plant architecture,
+together with agronomic traits used in subsequent analyses.
 
 **Main output:**
 
-```text
 data/MyArchidata.csv
-```
 
----
+------------------------------------------------------------------------
 
 ## 2. Curate Experimental-Design Information
 
 **Script:** `analysis/data_curation.Rmd`
 
-This script checks and harmonizes experimental-design information, distinguishes replicated and non-replicated trials, creates nested trial-design variables, filters unsuitable observations and trial designs, and generates the curated phenotypic dataset used in subsequent analyses.
+This script examines the experimental-design structure of the historical
+field-trial data and prepares variables required for subsequent
+mixed-model analyses.
+
+The workflow distinguishes replicated and non-replicated trials and
+creates nested design variables describing year within location, trial
+structure, replicates, and blocks. These variables are used to account
+for the heterogeneous experimental designs represented in the historical
+breeding data.
 
 **Main output:**
 
-```text
 data/MyArchiphenotypes.csv
-```
 
----
+------------------------------------------------------------------------
 
 ## 3. Single-Trial Quality Control
 
 **Script:** `analysis/fieldtrialfilter.Rmd`
 
-This script performs single-trial quality control for replicated and non-replicated trials using mixed models.
+This script performs single-trial quality control separately for
+replicated and non-replicated trials using mixed-model analyses.
 
-For each trait-by-trial combination, the analysis estimates genetic variance, residual variance, broad-sense heritability, coefficient of variation, and experimental accuracy. Trial-trait combinations are filtered based on genetic signal and experimental accuracy, and observations with absolute studentized residuals greater than 3 are removed.
+For each trait-by-trial combination, genetic and residual variance
+components and measures of trial quality are estimated. Trial-trait
+combinations are retained based on genetic signal and experimental
+accuracy, and observations with absolute Studentized Residuals greater
+than 3 are removed.
 
-The resulting dataset provides the quality-controlled quantitative phenotypes used in subsequent analyses.
+The quality-controlled data from replicated and non-replicated trials
+are subsequently combined to generate the phenotypic dataset used in
+downstream analyses.
 
 **Main output:**
 
-```text
 data/MyArchiphenos_final.csv
-```
 
----
+------------------------------------------------------------------------
 
 ## 4. Plant-Shape Trait Processing
 
@@ -88,137 +112,169 @@ data/MyArchiphenos_final.csv
 
 This script processes the four plant-shape categories:
 
-* Cylindrical
-* Umbrella
-* Open
-* Compact
+-   Cylindrical
+-   Umbrella
+-   Open
+-   Compact
 
-The script summarizes the distribution of plant shapes across breeding stages, fits trial-level binomial mixed models, estimates genetic parameters and experimental accuracy, filters plant-shape trait-by-trial combinations, and generates the quality-controlled plant-shape dataset.
+Plant-shape categories are represented as binary variables for analysis.
+The script examines their distribution across the historical trials and
+applies binomial mixed-model analyses to characterize genetic variation
+in these traits.
+
+The resulting plant-shape data are used together with the quantitative
+architecture traits in subsequent phenotypic and genomic analyses.
 
 **Main output:**
 
-```text
 data/Shapephenos_filtered.csv
-```
 
----
+------------------------------------------------------------------------
 
-## 5. Multi-Environment Phenotypic Analysis
+## 5. Multi-Environment Mixed-Model Analysis
 
 **Script:** `analysis/Phenodata_analysis.Rmd`
 
-This script performs the main phenotypic analyses using the quality-controlled trial datasets.
+This script performs the main multiple-trial mixed-model analyses for
+the quantitative architecture and agronomic traits and for the binary
+plant-shape traits.
 
-The analyses include:
+For quantitative traits, linear mixed-effects models are used to
+estimate accession effects and variance components across trials. For
+plant-shape categories, generalized linear mixed-effects models with a
+binomial distribution are fitted.
 
-* summaries of trait distributions across breeding programs and breeding stages;
-* comparisons among breeding stages;
-* multi-environment mixed-model analyses;
-* estimation of variance components and accession effects;
-* calculation of BLUPs and deregressed BLUPs;
-* correlations among plant architecture, plant-shape, and agronomic traits; and
-* preparation of phenotypic inputs for subsequent genomic analyses.
-
-The combined BLUP information is saved for downstream GWAS and genomic prediction.
+The script generates accession BLUPs and associated quantities used in
+downstream analyses and combines the quantitative and plant-shape
+results into the phenotypic inputs required for genomic analyses.
 
 **Key outputs include:**
 
-```text
+``` text
 Result/GeneralMML_result.rds
 Result/results_Shape.rds
 output/blups_Archi.rds
+output/ArchitMML_blups.rds
 output/blups_shape.rds
+output/ShapeMML_blups.rds
 output/blups.rds
 ```
+------------------------------------------------------------------------
 
----
+## 6. Phenotypic Summaries and Population Structure
 
-# Genomic Analysis
+**Script:** `analysis/generalanalysis.Rmd`
 
-## 6. Genotype and VCF Processing
+This script generates summary statistics, tables, and figures used to
+characterize the phenotypic and genomic datasets.
 
-**Script:** `analysis/VCFfilestreatment.Rmd`
+Phenotypic analyses include summaries of trait distributions across
+breeding programs and breeding stages, plant-shape distributions,
+correlations among accession BLUPs, and summaries of variance components
+and heritability.
 
-This script processes the genotype data used in the genomic analyses.
+The script also evaluates population structure among genotyped
+accessions using principal component analysis (PCA). PCA results are
+used to characterize genetic structure and to support subsequent
+genome-wide association analyses.
 
-The major steps include:
-
-* handling duplicate sample identifiers;
-* combining and subsetting VCF genotype data;
-* matching genotyped accessions with accessions having phenotypic information;
-* converting genotype information into haplotype and dosage matrices;
-* filtering markers based on minor allele frequency;
-* constructing genomic relationship matrices; and
-* preparing genetic-map and recombination-frequency information for downstream analyses.
+The script additionally generates SNP contribution information for the
+principal components and figures describing population structure.
 
 **Key outputs include:**
 
-```text
+Result/MySummaryData.csv
+Result/MySummaryShapeDataS.csv
+Result/Vartable.csv
+Result/pca_result.rds
+Result/pca_ind.rds
+Result/pca_ind_dim12.csv
+output/Dosage_pca.csv
+
+------------------------------------------------------------------------
+
+# Genotype Processing
+
+## 7. Genotype and VCF Processing
+
+**Script:** `analysis/VCFfilestreatment.Rmd`
+
+This script prepares the genotype data for genomic analyses.
+
+Major steps include:
+
+-   processing and subsetting VCF genotype data;
+-   handling genotype and sample identifiers;
+-   matching genotyped accessions with phenotypic records;
+-   generating dosage and haplotype matrices;
+-   filtering markers;
+-   constructing additive and dominance genomic relationship matrices;
+    and
+-   preparing genetic-map and recombination-frequency information used
+    in genomic analyses.
+
+**Key outputs include:**
+
 data/dosages.rds
 data/haplotypes.rds
 output/kinship_add.rds
 output/kinship_dom.rds
 output/interpolated_genmap.rds
 output/recombFreqMat_1minus2c.rds
-```
 
-Some VCF-processing steps are performed using command-line tools including `bcftools`, `vcftools`, and PLINK, as documented in the script.
+Some genotype-processing steps use external command-line tools as
+documented in the script.
 
----
+------------------------------------------------------------------------
 
-## 7. Dataset Summary and Population Structure
+# Genome-Wide Association and Linkage Disequilibrium Analysis
 
-**Script:** `analysis/generalanalysis.Rmd`
-
-This script generates summary statistics and tables used in the manuscript and evaluates population structure using principal component analysis (PCA) of the genotype dosage matrix.
-
-The script summarizes the phenotypic dataset by trait, breeding program, experimental design, year, and location. PCA is used to characterize genetic structure among genotyped accessions and to generate principal-component information used in the genome-wide association analyses.
-
-**Key outputs include:**
-
-```text
-Result/MySummaryData.csv
-Result/MySummaryShapeDataS.csv
-output/wholepca_result.rds
-Result/pca_result.rds
-Result/pca_ind.rds
-Result/pca_ind_dim12.csv
-```
-
----
-
-# Genome-Wide Association Analysis
-
-## 8. GWAS
+## 8. Genome-Wide Association Analysis
 
 **Script:** `analysis/ArchiGWAS.Rmd`
 
-This script performs genome-wide association analyses for plant architecture and plant-shape traits.
+This script performs genome-wide association analyses for the plant
+architecture and plant-shape traits.
 
-Deregressed BLUPs from the multi-environment analyses are matched with the corresponding genotyped accessions. Genotype, kinship, and population-structure information are then incorporated into the GWAS workflow.
+Phenotypic BLUPs from the multiple-trial analyses are matched with
+genotyped accessions and used as phenotypic response variables for GWAS.
 
-The primary GWAS analyses reported in the study are implemented in **GAPIT** using:
+The analyses are implemented in **GAPIT** using two complementary
+models:
 
-* Mixed Linear Model (**MLM**)
-* Bayesian-information and Linkage-disequilibrium Iteratively Nested Keyway (**BLINK**)
+-   Mixed Linear Model (**MLM**)
+-   Bayesian-information and Linkage-disequilibrium Iteratively Nested
+    Keyway (**BLINK**)
 
-Principal components are included to account for population structure, and marker filtering is applied based on minor allele frequency.
+The first three principal components are included to account for
+population structure, and SNPs are filtered using a minor allele
+frequency threshold of 0.01.
 
-The script also contains the commands used to calculate pairwise linkage disequilibrium with PLINK.
+The script generates GWAS results and Manhattan and Q--Q plots for the
+architecture and plant-shape traits.
 
----
+------------------------------------------------------------------------
 
-## 9. Linkage Disequilibrium Decay
+## 9. Linkage Disequilibrium Analysis
 
-**Script:** `analysis/L decay code Jean_Luc.R`
+**Scripts:**
 
-This script generates the linkage-disequilibrium decay figure from PLINK pairwise LD output.
+analysis/ArchiGWAS.Rmd
+analysis/L decay code Jean_Luc.R
 
-It calculates physical distances between marker pairs, summarizes mean \(r^2\) across log-spaced distance bins, and displays the distribution of pairwise LD together with the binned mean LD-decay curve.
 
-The resulting figure is used to visualize the relationship between linkage disequilibrium and physical distance between markers.
+Pairwise linkage disequilibrium is calculated from the genotype data
+using PLINK. The analysis evaluates SNP pairs separated by up to 1 Mb.
 
----
+The LD-decay workflow calculates physical distances between marker
+pairs, summarizes mean pairwise (r\^2) across distance bins, and
+generates the genome-wide LD-decay figure.
+
+The GWAS workflow also extracts pairwise LD among significant chromosome
+2 markers associated with branching level number for supplementary
+analysis.
+
+------------------------------------------------------------------------
 
 # Genomic Prediction
 
@@ -226,33 +282,50 @@ The resulting figure is used to visualize the relationship between linkage diseq
 
 **Script:** `analysis/genselect.Rmd`
 
-This script evaluates genomic prediction for plant architecture and plant-shape traits.
+This script evaluates genomic prediction accuracy for plant architecture
+and plant-shape traits.
 
-Phenotypic BLUPs are matched with the genotype data, and only accessions having both phenotypic and genotypic information are retained.
+Phenotypic BLUPs are matched with the genomic relationship matrices, and
+accessions with the required phenotypic and genotypic information are
+retained for prediction.
 
-Prediction accuracy is evaluated using repeated five-fold cross-validation. The analyses compare genomic prediction models incorporating:
+Prediction accuracy is evaluated using repeated **five-fold
+cross-validation**, with three repetitions and a fixed random seed for
+reproducibility.
 
-* additive genomic effects; and
-* additive plus dominance genomic effects.
+The final model comparison includes:
 
-Prediction accuracies are summarized and compared across plant architecture and plant-shape traits.
+-   **Additive model (A)**
+-   **Additive + dominance model (AD)**
+
+Prediction accuracies are summarized across traits, and differences
+among models and traits are evaluated statistically. The resulting
+distributions of prediction accuracy are presented in the genomic
+prediction figure.
 
 **Key inputs include:**
 
-```text
 output/blups.rds
 data/dosages.rds
 output/kinship_add.rds
 output/kinship_dom.rds
-```
 
----
+**Key outputs include:**
+
+
+output/A_KfoldsCval.rds
+output/AD_KfoldsCval.rds
+Result/Genomic_standardCV_Sum.csv
+Result/Genomic_prediction.pdf
+
+
+------------------------------------------------------------------------
 
 # Logical Order of Scripts
 
-For reproducibility, the main analysis scripts should be followed in the following order:
+The principal analysis workflow is:
 
-```text
+
 1. data_building.Rmd
         ↓
 2. data_curation.Rmd
@@ -267,66 +340,86 @@ For reproducibility, the main analysis scripts should be followed in the followi
         ↓
 7. generalanalysis.Rmd
         ↓
-        ├───────────────┐
-        ↓               ↓
-8. ArchiGWAS.Rmd    10. genselect.Rmd
+        ├──────────────────┐
+        ↓                  ↓
+8. ArchiGWAS.Rmd     10. genselect.Rmd
         ↓
-9. L decay code Jean_Luc.R
-```
+9. LD-decay analysis
 
-GWAS/LD analysis and genomic prediction represent downstream genomic analyses and can be conducted independently once the required phenotypic and genotypic inputs have been generated.
 
----
+Once the required phenotypic BLUPs and genotype data have been
+generated, GWAS/LD analysis and genomic prediction represent separate
+downstream analyses.
+
+
 
 # Software
 
-The analyses were conducted primarily in **R**. Major R packages used across the workflow include:
+The analyses were conducted primarily in **R**. Major R packages used
+across the workflow include:
 
-* `tidyverse`
-* `data.table`
-* `lme4`
-* `sommer`
-* `genomicMateSelectR`
-* `GAPIT`
-* `FactoMineR`
-* `factoextra`
-* `corrplot`
-* `ggplot2`
-* `vcfR`
+-   `tidyverse`
+-   `data.table`
+-   `lme4`
+-   `sommer`
+-   `genomicMateSelectR`
+-   `GAPIT`
+-   `FactoMineR`
+-   `factoextra`
+-   `corrplot`
+-   `ggplot2`
+-   `vcfR`
 
-Additional genotype-processing and linkage-disequilibrium analyses use:
+Additional genotype-processing and linkage-disequilibrium analyses use
+command-line software including:
 
-* **PLINK**
-* **VCFtools**
-* **BCFtools**
+-   **PLINK**
+-   **VCFtools**
+-   **BCFtools**
 
-Individual scripts provide additional information on the packages and functions used for each analysis.
+Individual scripts contain the packages and functions required for their
+respective analyses.
 
----
 
 # Data
 
-Phenotypic data were obtained from historical cassava breeding trials conducted by the International Institute of Tropical Agriculture (IITA) and the National Root Crops Research Institute (NRCRI) in Nigeria.
+Phenotypic data were obtained from historical cassava breeding trials
+conducted by the International Institute of Tropical Agriculture (IITA)
+and the National Root Crops Research Institute (NRCRI) in Nigeria.
 
-The analyses focus on plant architecture traits including plant height, first branching height, number of branching levels, and plant-shape categories, together with agronomic traits used to evaluate their relationships with cassava productivity.
+The analyses focus on plant architecture traits including plant height,
+first branching height, branching level number, and plant-shape
+categories, together with agronomic traits used to evaluate
+relationships between architecture and cassava productivity.
 
-Genotype data were processed from VCF files and matched to accessions with phenotypic information before GWAS and genomic prediction.
+Genotypic data were obtained from CassavaBase and processed for use in
+population-structure, GWAS, linkage-disequilibrium, and
+genomic-prediction analyses.
 
-Large genotype files and other source datasets may not be stored directly in this GitHub repository because of file-size and data-distribution considerations. The scripts identify the intermediate files required for the analyses.
+Large genotype files and other source datasets may not be stored
+directly in this repository because of file-size and data-distribution
+considerations. The analysis scripts document the intermediate files
+required to reproduce the workflow.
 
----
 
 # Reproducibility Notes
 
-The repository contains both the principal analyses reported in the manuscript and some exploratory code developed during the analysis process. The workflow described above identifies the scripts and analyses required to reproduce the principal results reported in the study.
+The scripts document the sequence of data preparation, quality control,
+phenotypic analysis, genotype processing, GWAS, linkage-disequilibrium
+analysis, and genomic prediction used in the study.
 
-Where external command-line software or large genotype files are required, the corresponding commands and expected input/output files are documented within the relevant analysis scripts.
+Intermediate R objects are saved throughout the workflow to allow
+downstream analyses to be reproduced without repeating computationally
+intensive upstream steps.
 
----
+Where external command-line software or large genotype files are
+required, the corresponding commands and expected input/output files are
+documented in the relevant scripts.
+
 
 # Citation
 
 If you use this workflow, please cite the associated manuscript:
 
-**Okoma et al.** *Genetic basis of Cassava (Manihot esculenta Crantz) plant architecture and its relevance for selection of farmer-preferred varieties.*
-
+**Okoma et al.** *Genetic basis of cassava (Manihot esculenta Crantz)
+plant architecture and its relevance for ideotype breeding.*
